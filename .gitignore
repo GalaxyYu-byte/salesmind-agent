@@ -216,3 +216,10 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Local deployment credentials. This document deliberately contains passwords
+# and must remain on the developer's machine.
+docs/服务器部署说明（私密）.md
+
+# Keep local project documentation out of Git.
+/docs/
