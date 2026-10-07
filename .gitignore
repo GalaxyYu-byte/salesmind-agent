@@ -49,6 +49,7 @@ coverage.xml
 *.py.cover
 .hypothesis/
 .pytest_cache/
+.test-tmp/
 cover/
 
 # Translations
@@ -149,6 +150,8 @@ activemq-data/
 
 # Environments
 .env
+.env.*
+!.env.example
 .envrc
 .venv
 env/
@@ -223,3 +226,15 @@ docs/服务器部署说明（私密）.md
 
 # Keep local project documentation out of Git.
 /docs/
+
+# Frontend dependencies, bundles and local tooling caches.
+node_modules/
+.npm-cache/
+.uv-cache/
+frontend/dist/
+frontend/test-results/
+frontend/.browser-check/
+
+# The Python packaging rule "lib/" must not hide frontend source modules.
+!/frontend/src/lib/
+!/frontend/src/lib/**

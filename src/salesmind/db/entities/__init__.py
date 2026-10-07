@@ -1,5 +1,6 @@
 """SQLAlchemy entities matching the reviewed MySQL DDL."""
 
+from salesmind.db.base import AgentAppBase, SalesDataBase
 from salesmind.db.entities.agent_app import (
     AnalysisRun,
     AppUser,
@@ -17,6 +18,9 @@ from salesmind.db.entities.sales_data import (
     SalesRegion,
     SalesRep,
 )
+from salesmind.db.entities.schema_comments import apply_column_comments
+
+apply_column_comments(SalesDataBase.metadata, AgentAppBase.metadata)
 
 __all__ = [
     "AnalysisRun",
