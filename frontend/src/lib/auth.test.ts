@@ -114,3 +114,48 @@ describe('authentication lifecycle', () => {
     expect(auth.useAuth().user.value).toBeNull()
   })
 })
+
+describe('permission response invalidation', () => {
+  it('rejects a pending old response after another request observes revoked access', async () => {
+    let complete!: (response: Response) => void
+    const delayed = new Promise<Response>(resolve => { complete = resolve })
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+      if (url.endsWith('/login')) return tokens('access')
+      if (url.includes('/artifacts/')) return delayed
+      return denied(403)
+    }))
+    const auth = await import('./auth')
+    await auth.login(body)
+    const stale = auth.authFetch('/api/v1/artifacts/old')
+    const rejected = expect(stale).rejects.toMatchObject({ status: 409 })
+    expect((await auth.authFetch('/api/v1/sales/overview')).status).toBe(403)
+    complete(new Response(JSON.stringify({ gross_profit: '987654.00' })))
+    await rejected
+  })
+
+  it('rejects old JSON when permissions change while the response body is being read', async () => {
+    let complete!: (value: unknown) => void
+    const delayed = new Promise<unknown>(resolve => { complete = resolve })
+    const response = new Response('{}')
+    vi.spyOn(response, 'json').mockImplementation(() => delayed)
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce(tokens('access')).mockResolvedValue(response))
+    const auth = await import('./auth')
+    await auth.login(body)
+    const received = await auth.authFetch('/api/v1/artifacts/old')
+    const stale = auth.readAccessJson(received)
+    const rejected = expect(stale).rejects.toMatchObject({ status: 409 })
+    auth.invalidateAccess()
+    complete({ gross_profit: '987654.00' })
+    await rejected
+  })
+
+  it('rejects a result with an older permission version or a different account', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(tokens('access')))
+    const auth = await import('./auth')
+    await auth.login(body)
+    const access = { user_id: user.id, permission_version: 2, scope_hash: 'scope-2', scope_label: '授权区域', allowed_metrics: ['sales_amount'] }
+    auth.observeAccess(access)
+    expect(() => auth.observeAccess({ ...access, permission_version: 1 })).toThrow('权限已变化')
+    expect(() => auth.observeAccess({ ...access, user_id: 'other-user' })).toThrow('账号已切换')
+  })
+})

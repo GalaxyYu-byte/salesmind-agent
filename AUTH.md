@@ -1,6 +1,6 @@
 # 登录模块
 
-首版支持用户名、密码、图片验证码登录及当前设备退出。直接查询现有 `agent_app.app_user`，不创建或修改账号，不需要数据库迁移。所有启用账号均可访问全部销售数据；角色、区域和指标字段暂不参与数据范围限制。
+支持用户名、密码、图片验证码登录及当前设备退出。直接查询现有 `agent_app.app_user`，不创建或修改账号，不需要数据库迁移。销售查询按账号角色、区域授权与指标白名单限制；历史结果、回放与报告读取校验当前权限，见 [账号与数据权限](PERMISSIONS.md)。
 
 ## 本机启动
 
@@ -15,18 +15,16 @@ SALESMIND_AUTH_REFRESH_SECONDS=604800
 
 本机联调已生成密钥并写入 `.env`，不会打印或提交该密钥。缺少密钥时登录接口返回 503，没有硬编码或每次重启生成的备用密钥。
 
-保持 SSH 隧道运行，再启动 API 和前端：
+在 `.env` 中配置服务器直连地址（MySQL 3307、Redis 6380），再启动 API 和前端，无需 SSH 隧道：
 
 ```powershell
-.venv\Scripts\python.exe scripts/dev_tunnel.py
-# 独立终端运行；已有隧道不重复启动。
 .venv\Scripts\python.exe -m uvicorn salesmind.main:app --host 127.0.0.1 --port 8000
 # 另一个终端：
 cd frontend
 npm run dev
 ```
 
-访问 http://127.0.0.1:5173 。`start-dev.bat` 仍用于启动前后端，SSH 隧道需先运行。旧的 `SALESMIND_ENABLE_DEVELOPMENT_QUERIES` 开关不再绕过登录。
+访问 http://127.0.0.1:5173 。也可用 `start-dev.bat` 一键启动前后端，后端直接连接服务器上的 MySQL 和 Redis。旧的 `SALESMIND_ENABLE_DEVELOPMENT_QUERIES` 开关不再绕过登录。
 
 账号密码遵循原有初始化配置，本次真实联调用 `demo_director`。兼容已有 `pbkdf2_sha256$迭代次数$盐$摘要` 哈希；后续创建密码可用 `core.security.hash_password`，它使用随机盐和 600,000 次 PBKDF2。没有注册、找回密码、用户管理或默认后门账号。
 
@@ -41,7 +39,7 @@ npm run dev
 | GET `/api/v1/auth/me` | Bearer Access Token | 用户 ID、用户名、显示名、角色 |
 | GET `/api/v1/sales/overview` | Bearer Access Token及销售范围参数 | 真实 MySQL 销售汇总 |
 
-所有 POST 请求要求 `X-SalesMind-CSRF: 1`；有 Origin 时必须属于 `SALESMIND_AUTH_ALLOWED_ORIGINS`。部署采用同源反向代理，没有开放跨域 CORS。所有认证与销售响应包含 `Cache-Control: no-store`。登录失败不区分未知账号、错误密码和停用账号；验证错误不回显提交的密码，连接异常不包含底层凭据。
+认证模块的 POST 请求要求 `X-SalesMind-CSRF: 1`；有 Origin 时必须属于 `SALESMIND_AUTH_ALLOWED_ORIGINS`。会话和任务接口直接使用 Bearer 鉴权，不使用 Refresh Cookie 授权。部署采用同源反向代理，没有开放跨域 CORS。所有 API 响应包含 `Cache-Control: no-store`。登录失败不区分未知账号、错误密码和停用账号；验证错误不回显提交的密码，连接异常不包含底层凭据。
 
 ## Token 与 Redis
 
@@ -57,7 +55,7 @@ Cookie 使用 HttpOnly、SameSite=Strict、路径 `/api/v1/auth`，没有宽泛 
 
 登录页成功后才挂载工作台和发起销售请求。Access Token 只放内存，刷新页面通过 Cookie 恢复登录；请求遇到 401 时合并刷新并最多重试一次。支持 Web Locks 的浏览器还会跨标签串行化 Cookie 的登录、刷新和退出。刷新失效返回登录页，连接暂时失败保留用户状态并显示错误。
 
-会话与报告按用户 ID 保存为 `salesmind.user.<id>.v1`，Token 不持久化。旧演示存储键保留但不混入登录账号。缓存属于本机浏览器数据，不等于后端持久化或加密存储。
+会话历史、任务、事件和结果已按用户归属保存到 MySQL，接口与 SSE 说明见 [CONVERSATIONS.md](CONVERSATIONS.md)。报告仅在浏览器保存服务端结果引用和不含数值的分析条件，读取与导出重新鉴权；旧报告快照不自动导入。Token 不持久化。
 
 ## 验证
 

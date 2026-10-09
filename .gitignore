@@ -238,3 +238,6 @@ frontend/.browser-check/
 # The Python packaging rule "lib/" must not hide frontend source modules.
 !/frontend/src/lib/
 !/frontend/src/lib/**
+
+# Isolated local test databases and manual smoke scripts.
+.test-tmp/

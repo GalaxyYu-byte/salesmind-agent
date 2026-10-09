@@ -1,183 +1,163 @@
 import { computed, onBeforeUnmount, ref, shallowRef, watch } from 'vue'
-import { answer, metricNames, money, parseQuestion, periodLabel, periodOptions, ranking, scopeName, series, source, total } from './analytics'
-import type { Analysis, Dataset, Scope } from './analytics'
-import { fetchSalesOverview } from './salesApi'
+import { analysisTable, answer, baselineLabel, canMetric, metricNames, money, periodLabel, periodOptions, ranking, scopeName, series, source, total, viewNames } from './analytics'
+import type { Access, Analysis, Dataset, Scope } from './analytics'
+import { fetchSalesOverview, mapSalesOverview } from './salesApi'
 import { csv, download, readState, saveState } from './storage'
-import type { Message, Report, Session } from './storage'
-import { useAuth } from './auth'
+import type { Report } from './storage'
+import { assertAccessGeneration, getAccessGeneration, invalidateAccess, onAccessInvalidated, useAuth } from './auth'
+import { analysisSpec, readArtifact } from './conversationsApi'
+import { useConversations } from './useConversations'
 
 export function useWorkbench() {
   const userId = useAuth().user.value?.id
   const saved = readState(userId)
-  const sessions = ref<Session[]>(saved.sessions)
   const reports = ref<Report[]>(saved.reports)
   const page = ref('overview')
   const period = ref('6')
   const region = ref(0)
   const prompt = ref('')
-  const currentId = ref<string | null>(null)
   const sidebarOpen = ref(false)
   const toast = ref('')
   const salesData = shallowRef<Dataset | null>(null)
   const salesLoading = ref(false)
   const salesError = ref('')
   const queryTime = ref('')
+  const cacheHit = ref(false)
+  const access = shallowRef<Access | undefined>()
+  const permissionEpoch = ref(0)
   let queryController: AbortController | undefined
   let querySequence = 0
   const scope = computed<Scope>(() => ({ months: [...(periodOptions.find(p => p.value === period.value) ?? periodOptions[0]!).months], region: region.value }))
-  async function refreshSales() {
+  async function refreshSales(refresh = true) {
     const sequence = ++querySequence
     queryController?.abort()
     queryController = new AbortController()
     salesLoading.value = true; salesError.value = ''; salesData.value = null
     try {
-      const result = await fetchSalesOverview(scope.value, queryController.signal)
+      const result = await fetchSalesOverview(scope.value, queryController.signal, refresh)
       if (sequence !== querySequence) return
-      salesData.value = result.dataset; queryTime.value = result.queriedAt
+      assertAccessGeneration(result.accessEpoch)
+      salesData.value = result.dataset; access.value = result.access; queryTime.value = result.queriedAt; cacheHit.value = result.cache?.hit ?? false
     } catch (error) {
       if (sequence !== querySequence) return
       salesError.value = error instanceof Error ? error.message : '销售服务暂时不可用'
     } finally { if (sequence === querySequence) salesLoading.value = false }
   }
-  watch(scope, () => { void refreshSales() }, { immediate: true })
-  const currentSession = computed(() => sessions.value.find(s => s.id === currentId.value))
-  const lastAnalysis = computed(() => currentSession.value?.messages.filter(m => m.status === 'completed').at(-1)?.analysis)
-  const active = computed(() => sessions.value.flatMap(s => s.messages).find(m => m.status === 'running'))
-  const pending = computed(() => currentSession.value?.messages.find(m => ['running', 'awaiting_input', 'interrupted'].includes(m.status)))
-  let runController: AbortController | undefined
-  let runningId: string | undefined
+  watch(scope, () => { void refreshSales(false) }, { immediate: true })
   let toastTimer: ReturnType<typeof setTimeout> | undefined
   let storageWarning = false
-  const stages = ['理解问题', '查询数据', '计算指标', '生成图表', '整理结论']
+  const { sessions, currentId, currentSession, lastAnalysis, active, pending, stages, historyLoading, historyError, submitting, loadSessions, newSession, openSession, send, stop, resume, clarify, removeSession } = useConversations(prompt, notify, navigate)
+  const unsubscribeAccess = onAccessInvalidated(() => {
+    salesData.value = null; access.value = undefined; queryTime.value = ''; cacheHit.value = false; permissionEpoch.value++
+    salesError.value = '账号权限已变化，请重新查询当前可见数据'
+    reports.value.forEach(report => { report.analysis = undefined })
+  })
+  const allowedMetrics = computed(() => (Object.keys(metricNames) as Analysis['metric'][]).filter(metric => canMetric(metric, access.value)))
+  const can = (metric: Analysis['metric']) => canMetric(metric, access.value)
+  const canExtra = (name: string) => access.value?.allowed_metrics.includes(name) ?? false
 
   function notify(message: string) {
     toast.value = message
     clearTimeout(toastTimer)
     toastTimer = setTimeout(() => { toast.value = '' }, 3200)
   }
-  watch([sessions, reports], () => {
-    if (!saveState({ sessions: sessions.value, reports: reports.value }, userId) && !storageWarning) {
-      storageWarning = true; notify('浏览器存储不可用，刷新后将无法恢复本次记录。')
+  watch(reports, () => {
+    if (!saveState({ sessions: [], reports: reports.value }, userId) && !storageWarning) {
+      storageWarning = true; notify('浏览器存储不可用，本地报告可能无法保存。')
     }
   }, { deep: true })
   function navigate(target: string) { page.value = target; sidebarOpen.value = false }
-  function newSession() {
-    const session: Session = { id: crypto.randomUUID(), title: '新的分析', updated: new Date().toISOString(), messages: [] }
-    sessions.value.unshift(session); currentId.value = session.id; prompt.value = ''; navigate('analysis')
-    return session
-  }
-  function openSession(id: string) { currentId.value = id; prompt.value = ''; navigate('analysis') }
-  async function advance(message: Message) {
-    if (message.status !== 'running' || !message.analysis) return
-    runningId = message.id
-    const controller = new AbortController()
-    runController = controller
-    message.stage = 1
-    try {
-      const result = await fetchSalesOverview(message.analysis.scope, controller.signal)
-      if (controller.signal.aborted || message.status !== 'running' || runningId !== message.id) return
-      message.analysis = { ...message.analysis, dataset: result.dataset, queriedAt: result.queriedAt }
-      message.stage = 4; message.status = 'completed'; message.note = undefined
-      notify('MySQL 查询完成，结果已保存到会话')
-    } catch (error) {
-      if (controller.signal.aborted || message.status !== 'running' || runningId !== message.id) return
-      message.status = 'failed'; message.note = error instanceof Error ? error.message : '真实销售查询失败，请重试'
-    } finally {
-      if (runningId === message.id) { runningId = undefined; runController = undefined }
-    }
-  }
-  function send(question = prompt.value, fresh = false) {
-    const input = question.trim()
-    if (!input) return
-    if (active.value) { notify('请先完成或停止正在执行的分析'); return }
-    if (pending.value && !fresh) {
-      if (pending.value.status === 'awaiting_input') {
-        const parsed = parseQuestion(`${pending.value.question}，${input}`, scope.value)
-        if (parsed.kind === 'ready') { pending.value.analysis = parsed.analysis; pending.value.status = 'running'; pending.value.note = `补充范围：${input}`; advance(pending.value); prompt.value = ''; return }
-        notify(parsed.message); return
-      }
-      notify('请先继续或取消暂停的分析'); return
-    }
-    if (fresh || !currentSession.value) newSession()
-    const session = currentSession.value!
-    const parsed = parseQuestion(input, scope.value, lastAnalysis.value)
-    const message: Message = {
-      id: crypto.randomUUID(), question: input, stage: 0,
-      status: parsed.kind === 'ready' ? 'running' : parsed.kind === 'clarify' ? 'awaiting_input' : 'failed',
-      ...(parsed.kind === 'ready' ? { analysis: parsed.analysis } : { note: parsed.message }),
-    }
-    session.messages.push(message)
-    if (session.messages.length === 1) session.title = input.slice(0, 28)
-    session.updated = new Date().toISOString()
-    sessions.value.sort((a, b) => b.updated.localeCompare(a.updated))
-    prompt.value = ''; navigate('analysis')
-    if (message.status === 'running') advance(session.messages.at(-1)!)
-  }
-  function stop(message: Message, pause = false) {
-    if (runningId === message.id) { runController?.abort(); runningId = undefined; runController = undefined }
-    message.status = pause ? 'interrupted' : 'cancelled'
-    message.note = pause ? '已暂停读取结果，继续时会按同一范围重新查询。' : '已停止读取本次查询结果，你可以提交新的问题。'
-  }
-  function resume(message: Message) {
-    if (active.value) { notify('另一个分析正在执行，请稍后继续'); return }
-    message.status = 'running'; message.note = undefined; advance(message)
-  }
-  function clarify(message: Message, value: string) {
-    if (active.value) { notify('另一个分析正在执行，请稍后继续'); return }
-    const chosen = periodOptions.find(p => p.value === value)!
-    const base: Analysis = { scope: { months: [...chosen.months], region: scope.value.region }, metric: 'amount', view: 'trend', chart: 'line', question: message.question }
-    const parsed = parseQuestion(message.question, base.scope, base)
-    if (parsed.kind !== 'ready') { notify(parsed.message); return }
-    message.analysis = parsed.analysis; message.status = 'running'; message.note = `统计范围：${chosen.label}`; advance(message)
-  }
   function saveReport(analysis: Analysis) {
-    const snapshot = JSON.parse(JSON.stringify(analysis)) as Analysis
-    const exists = reports.value.find(r => JSON.stringify(r.analysis.scope) === JSON.stringify(snapshot.scope) && r.analysis.metric === snapshot.metric && r.analysis.view === snapshot.view)
+    if (!analysis.artifactId) { notify('这次分析没有服务端结果，请重新分析后保存'); return }
+    const spec = analysisSpec(analysis)
+    const exists = reports.value.find(r => r.artifactId === analysis.artifactId)
     if (exists) { notify('这份分析已经保存在报告中'); return }
-    reports.value.unshift({ id: crypto.randomUUID(), title: `${scopeName(analysis.scope, analysis.dataset ?? source)}${metricNames[analysis.metric]}${analysis.view === 'trend' ? '趋势' : '排名'}分析`, created: new Date().toISOString(), analysis: snapshot })
+    reports.value.unshift({ id: crypto.randomUUID(), title: `${scopeName(analysis.scope, analysis.dataset)}${metricNames[analysis.metric]}${viewNames[analysis.view]}分析`, created: new Date().toISOString(), artifactId: analysis.artifactId, spec })
     notify('报告已保存，可在“分析报告”中查看')
   }
-  function exportAnalysis(analysis: Analysis) {
+  async function verifiedAnalysis(analysis: Analysis): Promise<Analysis> {
+    const accessEpoch = getAccessGeneration()
+    if (!analysis.artifactId) throw new Error('缺少服务端结果，请重新分析')
+    const artifact = await readArtifact(analysis.artifactId)
+    assertAccessGeneration(accessEpoch)
+    if (!artifact.schema?.analysis) throw new Error('历史结果缺少有效分析条件，请重新分析')
+    const spec = { ...artifact.schema.analysis, chart: analysis.chart }
+    const overview = mapSalesOverview(artifact.payload, spec.scope)
+    assertAccessGeneration(accessEpoch)
+    if (!canMetric(spec.metric, overview.access)) throw new Error('当前账号无权查看这个指标')
+    return { ...spec, question: analysis.question, artifactId: analysis.artifactId, dataset: overview.dataset, access: overview.access, queriedAt: overview.queriedAt, analysisResult: overview.analysisResult }
+  }
+  async function openReport(report: Report): Promise<Report | null> {
+    const accessEpoch = getAccessGeneration()
+    report.analysis = undefined
+    try { const analysis = await verifiedAnalysis({ ...report.spec, artifactId: report.artifactId, question: report.title }); assertAccessGeneration(accessEpoch); report.spec = analysisSpec(analysis); report.analysis = analysis; return report }
+    catch (error) { notify(error instanceof Error ? error.message : '报告暂时无法读取'); return null }
+  }
+  async function exportAnalysis(input: Analysis) {
+    const accessEpoch = getAccessGeneration()
+    try {
+      if (input.artifactId) { const result = await verifiedAnalysis(input); assertAccessGeneration(accessEpoch); exportVerifiedAnalysis(result); return }
+      const fresh = await fetchSalesOverview(input.scope, undefined, true)
+      assertAccessGeneration(accessEpoch)
+      if (!canMetric(input.metric, fresh.access)) throw new Error('当前账号无权查看这个指标')
+      exportVerifiedAnalysis({ ...analysisSpec(input), question: input.question, dataset: fresh.dataset, access: fresh.access, queriedAt: fresh.queriedAt })
+    } catch (error) { invalidateAccess(); notify(error instanceof Error ? error.message : '导出失败，请重新分析') }
+  }
+  function exportVerifiedAnalysis(analysis: Analysis) {
+    if (analysis.analysisResult) {
+      const result = analysis.analysisResult
+      const rows: (string | number)[][] = [['统计范围', scopeName(analysis.scope, analysis.dataset ?? source), periodLabel(analysis.scope.months)], ['查询时间', analysis.queriedAt ?? ''], ['排序', result.sort_by, result.sort_order], ...analysisTable(analysis)]
+      download(`SalesMind-${metricNames[analysis.metric]}-${analysis.scope.months[0]}.csv`, csv(rows)); notify('数据已导出'); return
+    }
     const chart = series(analysis)
-    const format = (v: number) => analysis.metric === 'count' ? v : (v / 100).toFixed(2)
+    const format = (v: number | null) => v === null ? '不可计算' : analysis.metric === 'count' ? v : (v / 100).toFixed(2)
     const rows: (string | number)[][] = [
       ['数据来源', analysis.dataset ? `MySQL 查询快照 v${analysis.dataset.version}` : `SalesMind 固定演示数据 v${source.version}`],
-      ['统计范围', scopeName(analysis.scope), periodLabel(analysis.scope.months)],
+      ['统计范围', scopeName(analysis.scope, analysis.dataset), periodLabel(analysis.scope.months)],
       ['口径', '仅已完成订单；退款和取消订单已排除'],
-      [analysis.view === 'trend' ? '月份' : '名称', metricNames[analysis.metric] + (analysis.metric === 'count' ? '（笔）' : '（元）'), ...(chart.baseline.length ? ['去年同期'] : [])],
+      [analysis.view === 'trend' ? '月份' : '名称', metricNames[analysis.metric] + (analysis.metric === 'count' ? '（笔）' : '（元）'), ...(chart.baseline.length ? [baselineLabel(analysis)] : [])],
       ...chart.labels.map((label, i) => [analysis.view === 'trend' ? analysis.scope.months[i]! : label, format(chart.values[i]!), ...(chart.baseline.length ? [chart.baseline[i] === null ? '数据未覆盖' : format(chart.baseline[i]!)] : [])]),
     ]
     download(`SalesMind-${metricNames[analysis.metric]}-${analysis.scope.months[0]}.csv`, csv(rows)); notify('数据已导出')
   }
-  function exportReport(report: Report) {
-    const result = answer(report.analysis)
-    const content = `# ${report.title}\n\n${result.title}\n\n${result.headline}\n\n${result.detail}\n\n## 统计数据\n\n${series(report.analysis).labels.map((name, i) => `- ${name}：${report.analysis.metric === 'count' ? series(report.analysis).values[i] : '¥ ' + money(series(report.analysis).values[i]!)}`).join('\n')}\n\n数据来源：${report.analysis.dataset ? "MySQL 查询快照 v" + report.analysis.dataset.version : "固定演示数据 v" + source.version}。仅已完成订单，排除退款和取消订单。\n\n${result.caveat}\n`
+  async function exportReport(report: Report) {
+    const accessEpoch = getAccessGeneration()
+    const loaded = await openReport(report)
+    if (!loaded?.analysis) return
+    try { assertAccessGeneration(accessEpoch) } catch (error) { notify(error instanceof Error ? error.message : '权限已变化，请重新读取'); return }
+    const analysis = loaded.analysis, result = answer(analysis), chart = series(analysis)
+    const table = analysisTable(analysis)
+    const tableLine = (row: (string | number)[]) => '| ' + row.map(value => String(value).replaceAll('|', '\\|').replaceAll(/\r?\n/g, ' ')).join(' | ') + ' |'
+    const statistics = table.length ? [tableLine(table[0]!), tableLine(table[0]!.map(() => '---')), ...table.slice(1).map(tableLine)].join('\n') : chart.labels.map((name, i) => `- ${name}：${chart.values[i] === null ? '不可计算' : analysis.analysisResult?.chart_unit === '%' ? chart.values[i]?.toFixed(2) + '%' : analysis.metric === 'count' ? chart.values[i] : '¥ ' + money(chart.values[i]!)}`).join('\n')
+    const content = `# ${report.title}\n\n${result.title}\n\n${result.headline}\n\n${result.detail}\n\n## 统计数据\n\n${statistics}\n\n数据来源：MySQL 查询快照 v${analysis.dataset!.version}。查询时间：${analysis.queriedAt ?? '未记录'}。仅已完成订单，排除退款和取消订单。\n\n${result.caveat}\n`
     download(`${report.title}.md`, content, 'text/markdown;charset=utf-8'); notify('报告已导出为 Markdown')
   }
-  function exportTable() {
-    const dataset = salesData.value
-    if (!dataset || salesLoading.value || salesError.value) { notify('请等待真实查询成功后再导出'); return }
+  async function exportTable() {
+    if (salesLoading.value) { notify('请等待真实查询成功后再导出'); return }
+    try {
+    const currentScope = { months: [...scope.value.months], region: scope.value.region }
+    const fresh = await fetchSalesOverview(currentScope, undefined, true)
+    assertAccessGeneration(fresh.accessEpoch)
+    const dataset = fresh.dataset
+    const permitted = (name: string) => fresh.access.allowed_metrics.includes(name)
+    const columns = [['amount', 'sales_amount', '销售额（元）'], ['count', 'order_count', '订单数（笔）'], ['profit', 'gross_profit', '毛利（元）']] as const
+    const visible = columns.filter(([, name]) => permitted(name))
+    const margin = permitted('gross_margin') && permitted('gross_profit') && permitted('sales_amount')
     const rows: (string | number)[][] = [
-      ['MySQL 实时查询', `v${dataset.version}`, periodLabel(scope.value.months), scopeName(scope.value, dataset)],
-      ['查询时间', queryTime.value],
-      ['月份', '区域', '销售额（元）', '订单数（笔）', '毛利（元）', '毛利率'],
+      ['MySQL 实时查询', `v${dataset.version}`, periodLabel(currentScope.months), scopeName(currentScope, dataset)],
+      ['查询时间', fresh.queriedAt],
+      ['月份', '区域', ...visible.map(([, , label]) => label), ...(margin ? ['毛利率'] : [])],
     ]
-    for (const month of scope.value.months) for (const item of dataset.regions.filter(r => !scope.value.region || r.id === scope.value.region)) {
+    for (const month of currentScope.months) for (const item of dataset.regions.filter(r => !currentScope.region || r.id === currentScope.region)) {
       const result = total({ months: [month], region: item.id }, undefined, dataset)
-      rows.push([month, item.name, (result.amount / 100).toFixed(2), result.count, (result.profit / 100).toFixed(2), result.amount ? (result.profit / result.amount * 100).toFixed(2) + '%' : '—'])
+      rows.push([month, item.name, ...visible.map(([key]) => result[key] === null ? '—' : key === 'count' ? result[key]! : (result[key]! / 100).toFixed(2)), ...(margin ? [result.amount && result.profit !== null ? (result.profit / result.amount * 100).toFixed(2) + '%' : '—'] : [])])
     }
     download('SalesMind-区域月度数据.csv', csv(rows)); notify('区域月度汇总已导出')
+    } catch (error) { salesData.value = null; notify(error instanceof Error ? error.message : '导出失败，请重新查询') }
   }
-  function removeSession(id: string) {
-    const session = sessions.value.find(s => s.id === id)
-    if (session?.messages.some(m => m.status === 'running')) { notify('请先停止分析，再删除会话'); return }
-    sessions.value = sessions.value.filter(s => s.id !== id)
-    if (currentId.value === id) currentId.value = null
-    notify('会话已删除')
-  }
-  const overview = computed<Analysis>(() => ({ scope: scope.value, metric: 'amount', view: 'trend', chart: 'line', question: '销售趋势分析', dataset: salesData.value ?? undefined, queriedAt: queryTime.value }))
+  const overview = computed<Analysis>(() => ({ scope: scope.value, metric: allowedMetrics.value[0] ?? 'amount', view: 'trend', chart: 'line', question: '销售趋势分析', dataset: salesData.value ?? undefined, access: access.value, queriedAt: queryTime.value }))
   const totals = computed(() => total(scope.value, undefined, salesData.value ?? { ...source, cells: [] }))
   const regionRows = computed(() => salesData.value ? ranking(scope.value, 'regions', 'amount', salesData.value) : [])
-  onBeforeUnmount(() => { queryController?.abort(); runController?.abort(); clearTimeout(toastTimer) })
-  return { sessions, reports, page, period, region, prompt, currentId, sidebarOpen, toast, scope, currentSession, pending, active, lastAnalysis, stages, overview, totals, regionRows, salesData, salesLoading, salesError, queryTime, refreshSales, notify, navigate, newSession, openSession, send, stop, resume, clarify, saveReport, exportAnalysis, exportReport, exportTable, removeSession }
+  onBeforeUnmount(() => { unsubscribeAccess(); queryController?.abort(); clearTimeout(toastTimer) })
+  return { sessions, reports, page, period, region, prompt, currentId, sidebarOpen, toast, scope, currentSession, pending, active, lastAnalysis, stages, overview, totals, regionRows, salesData, salesLoading, salesError, queryTime, cacheHit, access, allowedMetrics, permissionEpoch, can, canExtra, refreshSales, historyLoading, historyError, submitting, loadSessions, notify, navigate, newSession, openSession, send, stop, resume, clarify, saveReport, openReport, exportAnalysis, exportReport, exportTable, removeSession }
 }

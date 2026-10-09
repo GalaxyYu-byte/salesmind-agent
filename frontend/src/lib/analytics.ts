@@ -1,18 +1,46 @@
 import fixture from '../data/fixture.json'
 
 export const source = fixture
-export type Dataset = typeof fixture
+export const emptyDataset: Dataset = { version: 0, completeThrough: '', availableFrom: '', orderCount: null, regions: [], products: [], cells: [], access: { user_id: '', permission_version: 0, scope_hash: '', allowed_metrics: [], scope_label: '按账号授权' } }
+export interface Access { user_id: string; permission_version: number; scope_hash: string; allowed_metrics: string[]; scope_label: string }
+export interface DataCell { month: string; region: number; product: number; amount: number | null; cost: number | null; count: number | null; quantity: number | null; grossProfit?: number | null }
+export interface Dataset { version: number; completeThrough: string; availableFrom: string; orderCount: number | null; regions: { id: number; name: string }[]; products: { id: number; name: string; category: string }[]; cells: DataCell[]; access?: Access }
 export type Metric = 'amount' | 'count' | 'profit' | 'average'
 export type ChartKind = 'line' | 'bar'
-export type ViewKind = 'trend' | 'products' | 'regions'
+export type ViewKind = 'summary' | 'trend' | 'products' | 'regions'
+export const viewNames: Record<ViewKind, string> = { summary: '汇总', trend: '趋势', products: '商品排名', regions: '区域对比' }
 export interface Scope { months: string[]; region: number }
-export interface Totals { amount: number; cost: number; count: number; quantity: number; profit: number; average: number }
-export interface NamedTotal extends Totals { id: number; name: string; category?: string; growth: number | null; share: number }
+export interface Totals { amount: number | null; cost: number | null; count: number | null; quantity: number | null; profit: number | null; average: number | null }
+export interface NamedTotal extends Totals { id: number; name: string; category?: string; growth: number | null; share: number | null }
+export type Comparison = 'none' | 'yoy' | 'mom'
+export interface AnalysisRow {
+  id: string; name: string; current: string | null; baseline: string | null; yoy_change: string | null; yoy_percent: string | null; reason: string
+  comparison_change?: string | null; comparison_percent?: string | null; mom_change?: string | null; mom_percent?: string | null
+  anomaly?: boolean; expected?: string | null; deviation_percent?: string | null
+}
+export interface AnalysisResult {
+  rows: AnalysisRow[]
+  selected_ids: string[]; sort_by: string; sort_order: string
+  comparison?: Comparison | null; baseline_label?: string | null
+  headline: string; detail: string; caveat: string; chart_unit: string
+  figure: { data: Record<string, unknown>[]; layout: Record<string, unknown> }
+}
 export interface Analysis {
   scope: Scope; metric: Metric; view: ViewKind; chart: ChartKind; question: string
   dataset?: Dataset
   queriedAt?: string
+  comparison?: Comparison; sort_by?: 'value' | 'yoy_percent' | 'yoy_change' | 'mom_percent' | 'mom_change'; sort_order?: 'asc' | 'desc'; top_n?: number | null; goal?: 'overview' | 'largest_decline' | 'anomalies'
+  product_ids?: number[]; anomaly_window?: number; anomaly_threshold_percent?: number
+  analysisResult?: AnalysisResult
+  artifactId?: string
+  access?: Access
 }
+export function canMetric(metric: Metric, access?: Access) {
+  if (!access) return false
+  const required: Record<Metric, string[]> = { amount: ['sales_amount'], count: ['order_count'], profit: ['gross_profit'], average: ['avg_order_value', 'sales_amount', 'order_count'] }
+  return required[metric].every(name => access.allowed_metrics.includes(name))
+}
+export function canDerived(name: string, dataset: Dataset) { return !dataset.access || dataset.access.allowed_metrics.includes(name) }
 export const metricNames: Record<Metric, string> = { amount: '销售额', count: '订单数', profit: '毛利', average: '平均客单价' }
 export const periodOptions = [
   { value: '6', label: '最近六个完整月', short: '近 6 个月', months: range(3, 8) },
@@ -40,11 +68,14 @@ export function previousPeriod(months: string[]) {
 }
 export function total(scope: Scope, product?: number, dataset: Dataset = source): Totals {
   const rows = dataset.cells.filter(c => scope.months.includes(c.month) && (!scope.region || c.region === scope.region) && (product === undefined || c.product === product))
-  const result = rows.reduce((a, row) => ({ amount: a.amount + row.amount, cost: a.cost + row.cost, count: a.count + row.count, quantity: a.quantity + row.quantity }), { amount: 0, cost: 0, count: 0, quantity: 0 })
-  return { ...result, profit: result.amount - result.cost, average: result.count ? result.amount / result.count : 0 }
+  const sum = (field: 'amount' | 'cost' | 'count' | 'quantity', permission: string) => !canDerived(permission, dataset) || rows.some(row => row[field] === null) ? null : rows.reduce((n, row) => n + (row[field] ?? 0), 0)
+  const amount = sum('amount', 'sales_amount'), cost = sum('cost', 'sales_cost'), count = sum('count', 'order_count'), quantity = sum('quantity', 'quantity')
+  const profit = !canDerived('gross_profit', dataset) || rows.some(row => row.grossProfit === null || row.grossProfit === undefined && (row.amount === null || row.cost === null)) ? null : rows.reduce((n, row) => n + (row.grossProfit ?? (row.amount! - row.cost!)), 0)
+  const average = canDerived('avg_order_value', dataset) && amount !== null && count !== null ? count ? amount / count : 0 : null
+  return { amount, cost, count, quantity, profit, average }
 }
-export function growth(current: number, baseline: number): number | null { return baseline === 0 ? null : (current - baseline) / baseline * 100 }
-export function scopeName(scope: Scope, dataset: Dataset = source) { return dataset.regions.find(r => r.id === scope.region)?.name ?? '全部区域' }
+export function growth(current: number | null, baseline: number | null): number | null { return current === null || baseline === null || baseline === 0 ? null : (current - baseline) / baseline * 100 }
+export function scopeName(scope: Scope, dataset: Dataset = source) { return dataset.regions.find(r => r.id === scope.region)?.name ?? dataset.access?.scope_label ?? '全部区域' }
 export function periodLabel(months: string[]) {
   if (!months.length) return '未选择期间'
   return months.length === 1 ? months[0]!.replace('-', ' 年 ') + ' 月' : `${months[0]!.replace('-', '.')} — ${months.at(-1)!.replace('-', '.')}`
@@ -56,45 +87,85 @@ export function ranking(scope: Scope, by: 'products' | 'regions', metric: Metric
   return dimensions.map(item => {
     const current = by === 'products' ? total(scope, item.id, dataset) : total({ ...scope, region: item.id }, undefined, dataset)
     const baseline = by === 'products' ? total(baseScope, item.id, dataset) : total({ ...baseScope, region: item.id }, undefined, dataset)
-    return { ...current, ...item, growth: covered(baseScope.months, dataset) ? growth(current[metric], baseline[metric]) : null, share: full.amount ? current.amount / full.amount * 100 : 0 }
-  }).sort((a, b) => b[metric] - a[metric])
+    return { ...current, ...item, growth: canDerived('growth_rate', dataset) && covered(baseScope.months, dataset) ? growth(current[metric], baseline[metric]) : null, share: !canDerived('product_share', dataset) || current.amount === null || full.amount === null ? null : full.amount ? current.amount / full.amount * 100 : 0 }
+  }).sort((a, b) => (b[metric] ?? -Infinity) - (a[metric] ?? -Infinity))
 }
 export function percent(value: number | null, signed = true) { return value === null ? '无可比基期' : `${signed && value > 0 ? '+' : ''}${value.toFixed(1)}%` }
-export function money(cents: number, compact = false) {
+export function money(cents: number | null, compact = false) {
+  if (cents === null) return '—'
   const amount = cents / 100
   return compact && Math.abs(amount) >= 10000 ? `${(amount / 10000).toFixed(2)} 万` : amount.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
-export function metricValue(value: number, metric: Metric, compact = false) {
+export function metricValue(value: number | null, metric: Metric, compact = false) {
+  if (value === null) return '—'
   return metric === 'count' ? value.toLocaleString('zh-CN') : `¥ ${money(value, compact)}`
 }
+export function comparisonKind(analysis: Analysis): Comparison { return analysis.analysisResult?.comparison ?? analysis.comparison ?? 'yoy' }
+export function comparisonName(analysis: Analysis) { return comparisonKind(analysis) === 'mom' ? '环比' : comparisonKind(analysis) === 'yoy' ? '同比' : '比较' }
+export function baselineLabel(analysis: Analysis) { return analysis.analysisResult?.baseline_label ?? (comparisonKind(analysis) === 'mom' ? analysis.view === 'trend' || analysis.scope.months.length === 1 ? '上月' : '上一期间' : '去年同期') }
+export function comparisonPercent(row: AnalysisRow, analysis: Analysis) { return row.comparison_percent !== undefined ? row.comparison_percent : comparisonKind(analysis) === 'mom' ? row.mom_percent ?? null : comparisonKind(analysis) === 'yoy' ? row.yoy_percent : null }
+export function comparisonChange(row: AnalysisRow, analysis: Analysis) { return row.comparison_change !== undefined ? row.comparison_change : comparisonKind(analysis) === 'mom' ? row.mom_change ?? null : comparisonKind(analysis) === 'yoy' ? row.yoy_change : null }
+export function analysisRows(analysis: Analysis) { return analysis.analysisResult?.rows.filter(r => !analysis.top_n || analysis.goal === 'largest_decline' || analysis.goal === 'anomalies' || analysis.analysisResult!.selected_ids.includes(r.id)) ?? [] }
+export function analysisTable(analysis: Analysis): (string | number)[][] {
+  const result = analysis.analysisResult
+  if (!result) return []
+  const compare = comparisonKind(analysis) !== 'none' && analysis.goal !== 'anomalies'
+  const anomalies = analysis.goal === 'anomalies'
+  const unit = analysis.metric === 'count' ? '笔' : '元'
+  return [
+    ['名称', `本期（${unit}）`, ...(compare ? [baselineLabel(analysis), `${comparisonName(analysis)}增减（${unit}）`, `${comparisonName(analysis)}增长率（%）`] : []), ...(anomalies ? [`期望值（${unit}）`, '偏离率（%）', '检测结果'] : []), '说明'],
+    ...result.rows.map(row => [row.name, row.current ?? '不可计算', ...(compare ? [row.baseline ?? '未覆盖', comparisonChange(row, analysis) ?? '不可计算', comparisonPercent(row, analysis) ?? '不可比'] : []), ...(anomalies ? [row.expected ?? '基期不足', row.deviation_percent ?? '不可比', row.anomaly ? '异常' : row.deviation_percent == null ? '不可检测' : '正常'] : []), row.reason]),
+  ]
+}
+// 异常检测包含期望值曲线和独立异常标记，保留服务端图形语义。
+export function figureTraces(analysis: Analysis) {
+  return analysis.analysisResult?.figure.data.map(trace => analysis.goal === 'anomalies' ? { ...trace } : { ...trace, type: analysis.chart === 'bar' ? 'bar' : 'scatter', ...(analysis.chart === 'line' ? { mode: 'lines+markers' } : {}) }) ?? []
+}
 export function series(analysis: Analysis) {
-  const dataset = analysis.dataset ?? source
-  if (analysis.view !== 'trend') {
+  if (analysis.analysisResult) {
+    const result = analysis.analysisResult
+    const rows = analysisRows(analysis)
+    const percentage = result.chart_unit === '%'
+    const scale = percentage || analysis.metric === 'count' ? 1 : 100
+    return { labels: rows.map(r => r.name), values: rows.map(r => { const value = percentage ? comparisonPercent(r, analysis) : r.current; return value === null ? null : Number(value) * scale }), baseline: comparisonKind(analysis) !== 'none' && !percentage ? rows.map(r => r.baseline === null ? null : Number(r.baseline) * scale) : [] }
+  }
+  const original = analysis.dataset ?? (analysis.artifactId || analysis.access ? emptyDataset : source)
+  const dataset = analysis.product_ids?.length ? { ...original, products: original.products.filter(p => analysis.product_ids!.includes(p.id)), cells: original.cells.filter(c => analysis.product_ids!.includes(c.product)) } : original
+  const compare = comparisonKind(analysis)
+  const baseMonths = (months: string[]) => compare === 'mom' ? previousPeriod(months) : previousYear(months)
+  if (analysis.view === 'summary') {
+    const baselineMonths = baseMonths(analysis.scope.months)
+    return { labels: [periodLabel(analysis.scope.months)], values: [total(analysis.scope, undefined, dataset)[analysis.metric]], baseline: compare === 'none' ? [] : [canDerived('growth_rate', dataset) && covered(baselineMonths, dataset) ? total({ ...analysis.scope, months: baselineMonths }, undefined, dataset)[analysis.metric] : null] }
+  }
+  if (analysis.view === 'products' || analysis.view === 'regions') {
     const rows = ranking(analysis.scope, analysis.view, analysis.metric, dataset).slice(0, 7)
-    return { labels: rows.map(r => r.name), values: rows.map(r => r[analysis.metric]), baseline: [] as number[] }
+    return { labels: rows.map(r => r.name), values: rows.map(r => r[analysis.metric]), baseline: compare === 'mom' && canDerived('growth_rate', dataset) ? rows.map(r => covered(baseMonths(analysis.scope.months), dataset) ? total({ ...analysis.scope, months: baseMonths(analysis.scope.months), ...(analysis.view === 'regions' ? { region: r.id } : {}) }, analysis.view === 'products' ? r.id : undefined, dataset)[analysis.metric] : null) : [] as number[] }
   }
   return {
     labels: analysis.scope.months.map(m => `${Number(m.slice(5))} 月`),
     values: analysis.scope.months.map(m => total({ ...analysis.scope, months: [m] }, undefined, dataset)[analysis.metric]),
-    baseline: previousYear(analysis.scope.months).map(m => covered([m], dataset) ? total({ ...analysis.scope, months: [m] }, undefined, dataset)[analysis.metric] : null),
+    baseline: compare !== 'none' && canDerived('growth_rate', dataset) ? analysis.scope.months.map(month => { const [m] = baseMonths([month]); return covered([m!], dataset) ? total({ ...analysis.scope, months: [m!] }, undefined, dataset)[analysis.metric] : null }) : [],
   }
 }
 export function answer(analysis: Analysis) {
-  const dataset = analysis.dataset ?? source
+  const original = analysis.dataset ?? (analysis.artifactId || analysis.access ? emptyDataset : source)
+  const dataset = analysis.product_ids?.length ? { ...original, products: original.products.filter(p => analysis.product_ids!.includes(p.id)), cells: original.cells.filter(c => analysis.product_ids!.includes(c.product)) } : original
   const current = total(analysis.scope, undefined, dataset)
-  const baseline = total({ ...analysis.scope, months: previousYear(analysis.scope.months) }, undefined, dataset)
+  const baselineMonths = comparisonKind(analysis) === 'mom' ? previousPeriod(analysis.scope.months) : previousYear(analysis.scope.months)
+  const baseline = total({ ...analysis.scope, months: baselineMonths }, undefined, dataset)
   const title = `${scopeName(analysis.scope, dataset)} · ${periodLabel(analysis.scope.months)}`
-  const change = growth(current[analysis.metric], baseline[analysis.metric])
-  const comparison = !covered(previousYear(analysis.scope.months), dataset) ? '去年同期数据未完整覆盖，无法计算同比增长率。' : change === null ? '去年同期为零，无法计算同比增长率。' : `较去年同期${change >= 0 ? '增长' : '下降'} ${Math.abs(change).toFixed(1)}%。`
+  if (analysis.analysisResult) return { title, headline: analysis.analysisResult.headline, detail: analysis.analysisResult.detail, caveat: analysis.analysisResult.caveat }
+  const change = canDerived('growth_rate', dataset) ? growth(current[analysis.metric], baseline[analysis.metric]) : null
+  const comparison = comparisonKind(analysis) === 'none' ? '' : !covered(baselineMonths, dataset) ? `${baselineLabel(analysis)}数据未完整覆盖，无法计算${comparisonName(analysis)}增长率。` : change === null ? `${baselineLabel(analysis)}为零或指标未授权，无法计算${comparisonName(analysis)}增长率。` : `较${baselineLabel(analysis)}${change >= 0 ? '增长' : '下降'} ${Math.abs(change).toFixed(1)}%。`
   let headline = `${metricNames[analysis.metric]}为 ${metricValue(current[analysis.metric], analysis.metric, true)}，${comparison}`
-  if (analysis.view !== 'trend') {
+  if (analysis.view === 'products' || analysis.view === 'regions') {
     const first = ranking(analysis.scope, analysis.view, analysis.metric, dataset)[0]
-    if (first && first.amount > 0) headline = `${first.name}的${metricNames[analysis.metric]}排名第一，为 ${metricValue(first[analysis.metric], analysis.metric, true)}；销售额占当前范围的 ${first.share.toFixed(1)}%。`
+    if (first && first[analysis.metric] !== null) headline = `${first.name}的${metricNames[analysis.metric]}排名第一，为 ${metricValue(first[analysis.metric], analysis.metric, true)}${first.share === null ? '。' : `；销售额占当前范围的 ${first.share.toFixed(1)}%。`}`
   }
-  if (!current.count) headline = '当前范围在已覆盖期间内没有已完成订单，销售额和订单数均为零。'
+  if (current.count === 0 && current.amount === 0) headline = '当前范围在已覆盖期间内没有已完成订单，销售额和订单数均为零。'
   return {
     title, headline,
-    detail: `统计 ${current.count.toLocaleString()} 笔已完成订单，总毛利 ¥ ${money(current.profit, true)}，平均客单价 ¥ ${money(current.average)}。退款与取消订单已排除。`,
+    detail: [current.count === null ? '' : `统计 ${current.count.toLocaleString()} 笔已完成订单`, current.profit === null ? '' : `总毛利 ¥ ${money(current.profit, true)}`, current.average === null ? '' : `平均客单价 ¥ ${money(current.average)}`].filter(Boolean).join('，') + '。退款与取消订单已排除。',
     caveat: analysis.dataset ? '基于 MySQL 实时查询快照计算；仅统计已完成订单，业务原因需要额外证据验证。' : '基于固定演示数据计算；数字可核对，业务原因需要额外证据验证。',
   }
 }

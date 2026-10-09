@@ -9,11 +9,14 @@ from redis.exceptions import RedisError
 from sqlalchemy.exc import SQLAlchemyError
 
 from salesmind.api.auth import router as auth_router
+from salesmind.api.conversations import router as conversations_router
 from salesmind.api.sales import router as sales_router
 from salesmind.core.config import Settings, get_settings
 from salesmind.db.session import Database
 from salesmind.infrastructure.health import check_readiness
 from salesmind.infrastructure.redis import RedisStore
+from salesmind.services.query_cache import SalesQueryCache
+from salesmind.services.task_supervisor import TaskSupervisor
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -30,11 +33,29 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             resources.push_async_callback(redis.close)
             app.state.database = database
             app.state.redis = redis
+            query_cache = SalesQueryCache(
+                redis.client,
+                ttl_seconds=app.state.settings.sales_cache_seconds,
+                max_bytes=app.state.settings.sales_cache_max_bytes,
+                namespace=(
+                    app.state.settings.sales_database_url.get_secret_value()
+                    if app.state.settings.sales_database_url
+                    else "unconfigured"
+                ),
+            )
+            app.state.query_cache = query_cache
+            supervisor = TaskSupervisor(
+                database, app.state.settings, query_cache=query_cache
+            )
+            resources.push_async_callback(supervisor.close)
+            app.state.supervisor = supervisor
             try:
                 yield
             finally:
                 del app.state.database
                 del app.state.redis
+                del app.state.supervisor
+                del app.state.query_cache
 
     app = FastAPI(
         title=settings.app_name if settings is not None else "SalesMind Agent",
@@ -42,11 +63,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
     app.include_router(sales_router)
     app.include_router(auth_router)
+    app.include_router(conversations_router)
 
     @app.middleware("http")
     async def auth_cache_headers(request: Request, call_next):
         response = await call_next(request)
-        if request.url.path.startswith(("/api/v1/auth", "/api/v1/sales")):
+        if request.url.path.startswith("/api/v1/"):
             response.headers["Cache-Control"] = "no-store"
         return response
 

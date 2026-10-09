@@ -25,28 +25,59 @@ if (-not (Test-Path (Join-Path $frontendRoot 'node_modules/vite/bin/vite.js'))) 
 }
 
 function Stop-PortListener([int]$port) {
-    $connections = @(Get-NetTCPConnection -State Listen -LocalPort $port -ErrorAction SilentlyContinue)
-    $processIds = @($connections | Select-Object -ExpandProperty OwningProcess -Unique)
+    $deadline = (Get-Date).AddSeconds(10)
 
-    foreach ($processId in $processIds) {
-        if ($processId -and $processId -ne $PID) {
-            $process = Get-Process -Id $processId -ErrorAction SilentlyContinue
-            if ($process) {
-                Write-Host "Stopping PID $processId ($($process.ProcessName)) using port $port..."
-                Stop-Process -Id $processId -Force -ErrorAction Stop
-            }
-        }
-    }
-
-    for ($attempt = 0; $attempt -lt 20; $attempt++) {
-        $stillListening = @(Get-NetTCPConnection -State Listen -LocalPort $port -ErrorAction SilentlyContinue)
-        if ($stillListening.Count -eq 0) {
+    do {
+        $connections = @(Get-NetTCPConnection -State Listen -LocalPort $port -ErrorAction SilentlyContinue)
+        if ($connections.Count -eq 0) {
             return
         }
-        Start-Sleep -Milliseconds 250
-    }
 
-    throw "Port $port is still in use. Close its listener and run this script again."
+        # Uvicorn workers inherit the listening socket. Windows can still report
+        # the reloader's PID after it exits, so find children even for a dead PID.
+        $snapshot = @(Get-CimInstance Win32_Process -ErrorAction Stop)
+        $pending = New-Object 'System.Collections.Generic.Queue[int]'
+        $seen = New-Object 'System.Collections.Generic.HashSet[int]'
+        $processTree = @()
+        foreach ($ownerId in @($connections | Select-Object -ExpandProperty OwningProcess -Unique)) {
+            if ($ownerId -gt 0) {
+                $pending.Enqueue([int]$ownerId)
+            }
+        }
+
+        while ($pending.Count -gt 0) {
+            $processId = $pending.Dequeue()
+            if (-not $seen.Add($processId)) {
+                continue
+            }
+            if ($processId -eq $PID) {
+                throw "Refusing to stop the current startup process using port $port."
+            }
+            $processTree += @($snapshot | Where-Object { $_.ProcessId -eq $processId })
+            foreach ($child in @($snapshot | Where-Object { $_.ParentProcessId -eq $processId })) {
+                $pending.Enqueue([int]$child.ProcessId)
+            }
+        }
+
+        # Stop supervisors before workers so they cannot restart the workers.
+        foreach ($entry in $processTree) {
+            $process = Get-Process -Id $entry.ProcessId -ErrorAction SilentlyContinue
+            $startedAt = if ($process) { $process.StartTime } else { $null }
+            if ($startedAt -and [Math]::Abs(($startedAt.ToUniversalTime() - $entry.CreationDate.ToUniversalTime()).TotalMilliseconds) -lt 1) {
+                Write-Host "Stopping PID $($entry.ProcessId) ($($entry.Name)) using port $port..."
+                # Children can exit on their own while their parent is stopping.
+                Stop-Process -InputObject $process -Force -ErrorAction SilentlyContinue
+            }
+        }
+
+        Start-Sleep -Milliseconds 250
+    } while ((Get-Date) -lt $deadline)
+
+    $remaining = @(Get-NetTCPConnection -State Listen -LocalPort $port -ErrorAction SilentlyContinue)
+    if ($remaining.Count -gt 0) {
+        $owners = ($remaining | Select-Object -ExpandProperty OwningProcess -Unique) -join ', '
+        throw "Port $port is still in use by PID(s) $owners after stopping its process tree."
+    }
 }
 
 Stop-PortListener 8000

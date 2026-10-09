@@ -14,7 +14,7 @@ def clean_environment(monkeypatch):
     import os
 
     for name in os.environ:
-        if name.upper().startswith("SALESMIND_"):
+        if name.upper().startswith("SALESMIND_") or name.upper() == "DEEPSEEK_API_KEY":
             monkeypatch.delenv(name)
     get_settings.cache_clear()
     yield
@@ -23,6 +23,59 @@ def clean_environment(monkeypatch):
 
 def test_missing_database_config_allows_basic_startup():
     assert not Settings(_env_file=None).database_enabled
+
+
+def test_model_key_is_secret_and_model_settings_are_optional():
+    settings = Settings(_env_file=None, llm_api_key="private-model-key")
+    assert "private-model-key" not in repr(settings)
+    assert "private-model-key" not in settings.model_dump_json()
+    assert Settings(_env_file=None).llm_api_key is None
+
+
+def test_deepseek_key_alias_from_dotenv_and_environment(tmp_path, monkeypatch):
+    dotenv = tmp_path / ".env"
+    dotenv.write_text(
+        "SALESMIND_LLM_API_KEY=\nDEEPSEEK_API_KEY=dotenv-private-key\n",
+        encoding="utf-8",
+    )
+    assert (
+        Settings(_env_file=dotenv).llm_api_key.get_secret_value()
+        == "dotenv-private-key"
+    )
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "environment-private-key")
+    settings = Settings(_env_file=dotenv)
+    assert settings.llm_api_key.get_secret_value() == "environment-private-key"
+    assert "environment-private-key" not in settings.model_dump_json()
+    monkeypatch.setenv("SALESMIND_LLM_API_KEY", "project-private-key")
+    assert (
+        Settings(_env_file=dotenv).llm_api_key.get_secret_value()
+        == "project-private-key"
+    )
+
+
+def test_explicit_model_key_overrides_environment_alias(monkeypatch):
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "environment-private-key")
+    assert (
+        Settings(
+            _env_file=None, llm_api_key="explicit-private-key"
+        ).llm_api_key.get_secret_value()
+        == "explicit-private-key"
+    )
+    assert Settings(_env_file=None, llm_api_key=None).llm_api_key is None
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "ftp://host",
+        "https://user:password@host",
+        "https://host?key=secret",
+        "https://host#fragment",
+    ],
+)
+def test_model_endpoint_rejects_credentials_and_non_http_urls(url):
+    with pytest.raises(ValidationError):
+        Settings(_env_file=None, llm_base_url=url)
 
 
 def test_dotenv_and_environment_precedence(tmp_path, monkeypatch):
@@ -82,6 +135,9 @@ def test_invalid_database_config_is_rejected_without_exposing_secrets(
         ("db_pool_timeout", 0),
         ("db_pool_recycle", 0),
         ("db_connect_timeout", 0),
+        ("sales_cache_seconds", -1),
+        ("sales_cache_seconds", 3601),
+        ("sales_cache_max_bytes", 1023),
     ],
 )
 def test_invalid_pool_limits_are_rejected(name, value):

@@ -1,12 +1,19 @@
 import { describe, expect, it } from 'vitest'
-import { answer, covered, growth, money, parseQuestion, periodOptions, previousPeriod, previousYear, ranking, series, source, total } from './analytics'
-import type { Analysis, Scope } from './analytics'
+import { analysisTable, answer, baselineLabel, covered, figureTraces, growth, money, parseQuestion, periodOptions, previousPeriod, previousYear, ranking, series, source, total } from './analytics'
+import type { Analysis, AnalysisResult, Scope } from './analytics'
 import { csv } from './storage'
 
 const scope: Scope = { months: [...periodOptions[0]!.months], region: 0 }
 const base: Analysis = { scope, metric: 'amount', chart: 'line', view: 'trend', question: '销售趋势' }
 
 describe('fixed demo data and deterministic calculations', () => {
+  it('renders summary as one aggregate and computes average from the whole period', () => {
+    const summary: Analysis = { ...base, view: 'summary', metric: 'average', chart: 'bar' }
+    expect(series(summary).values).toEqual([total(scope).average])
+    expect(series(summary).labels).toHaveLength(1)
+    expect(answer(summary).headline).toContain('平均客单价')
+    expect(answer(summary).headline).not.toContain('排名第一')
+  })
   it('matches the original fixture manifest across all completed orders', () => {
     const result = total({ months: [...new Set(source.cells.map(c => c.month))], region: 0 })
     expect(result.amount).toBe(2560625636)
@@ -22,8 +29,8 @@ describe('fixed demo data and deterministic calculations', () => {
     expect(total({ months: ['2026-08'], region: 1 }, 14).profit).toBe(-2000)
   })
   it('regional partitions sum to the same aggregate', () => {
-    expect(ranking(scope, 'regions').reduce((sum, row) => sum + row.amount, 0)).toBe(total(scope).amount)
-    expect(ranking(scope, 'products').reduce((sum, row) => sum + row.count, 0)).toBe(total(scope).count)
+    expect(ranking(scope, 'regions').reduce((sum, row) => sum + row.amount!, 0)).toBe(total(scope).amount)
+    expect(ranking(scope, 'products').reduce((sum, row) => sum + row.count!, 0)).toBe(total(scope).count)
   })
   it('keeps an empty region empty', () => {
     expect(total({ ...scope, region: 5 }).amount).toBe(0)
@@ -108,5 +115,47 @@ describe('bounded demo question parsing', () => {
   })
   it('escapes CSV commas, quotes and newlines', () => {
     expect(csv([['华东,华南', 'a"b', '第一行\n第二行']])).toBe('"华东,华南","a""b","第一行\n第二行"')
+  })
+})
+
+
+describe('server analysis result', () => {
+  const result: AnalysisResult = { rows: [{ id: '2', name: '华南', current: '40', baseline: '100', yoy_change: '-60', yoy_percent: '-60', reason: '' }, { id: '1', name: '华东', current: '900', baseline: '1000', yoy_change: '-100', yoy_percent: '-10', reason: '' }], selected_ids: ['2'], sort_by: 'yoy_percent', sort_order: 'asc', headline: '华南同比下降最多，下降 60.00%。', detail: '按同比百分比比较', caveat: '查询快照', chart_unit: '%', figure: { data: [{ x: ['华南', '华东'], y: [-60, -10] }], layout: {} } }
+  it('keeps percentage units and the backend ranking rather than ranking by sales amount', () => {
+    const analysis: Analysis = { ...base, view: 'regions', goal: 'largest_decline', top_n: 1, comparison: 'yoy', analysisResult: result }
+    expect(series(analysis)).toEqual({ labels: ['华南', '华东'], values: [-60, -10], baseline: [] })
+    expect(answer(analysis).headline).toBe(result.headline)
+  })
+  it('converts server yuan amounts to the existing cents-based series contract', () => {
+    const analysis: Analysis = { ...base, view: 'regions', top_n: 1, analysisResult: { ...result, chart_unit: '元' } }
+    expect(series(analysis).values).toEqual([4000])
+  })
+  it('uses month-over-month values and labels instead of legacy year-over-year fields', () => {
+    const analysis: Analysis = { ...base, comparison: 'mom', view: 'regions', analysisResult: { ...result, comparison: 'mom', baseline_label: '上一期间', rows: [{ ...result.rows[0]!, yoy_percent: null, mom_change: '-20', mom_percent: '-33.33', comparison_change: '-20', comparison_percent: '-33.33' }] } }
+    expect(series(analysis).values).toEqual([-33.33])
+    expect(baselineLabel(analysis)).toBe('上一期间')
+    expect(analysisTable(analysis)[0]).toEqual(['名称', '本期（元）', '上一期间', '环比增减（元）', '环比增长率（%）', '说明'])
+    expect(analysisTable(analysis)[1]).toEqual(['华南', '40', '100', '-20', '-33.33', ''])
+    expect(series({ ...analysis, analysisResult: { ...analysis.analysisResult!, chart_unit: '元' } }).baseline).toEqual([10000])
+  })
+  it('keeps anomaly markers, expected values and all inspected months when top_n is set', () => {
+    const traces = [{ x: ['7月', '8月'], y: [50, 40], type: 'scatter', mode: 'lines' }, { x: ['7月', '8月'], y: [null, 40], type: 'scatter', mode: 'markers', marker: { color: '#c05040' } }]
+    const analysis: Analysis = { ...base, goal: 'anomalies', comparison: 'none', chart: 'bar', top_n: 1, analysisResult: { ...result, comparison: 'none', chart_unit: '元', rows: [{ ...result.rows[0]!, expected: '60', deviation_percent: '-33.33', anomaly: true }, { ...result.rows[1]!, expected: null, deviation_percent: null, anomaly: false }], figure: { data: traces, layout: {} } } }
+    expect(series(analysis)).toEqual({ labels: ['华南', '华东'], values: [4000, 90000], baseline: [] })
+    expect(figureTraces(analysis)).toEqual(traces)
+    expect(figureTraces({ ...analysis, chart: 'line' })[1]!.mode).toBe('markers')
+    expect(analysisTable(analysis)[0]).toEqual(['名称', '本期（元）', '期望值（元）', '偏离率（%）', '检测结果', '说明'])
+    expect(analysisTable(analysis)[1]).toEqual(['华南', '40', '60', '-33.33', '异常', ''])
+    expect(analysisTable(analysis)[2]).toContain('不可检测')
+  })
+  it('compares every trend month to the prior month in the dataset fallback', () => {
+    const analysis: Analysis = { ...base, comparison: 'mom', scope: { months: ['2026-07', '2026-08'], region: 1 } }
+    expect(series(analysis).baseline).toEqual(['2026-06', '2026-07'].map(month => total({ months: [month], region: 1 }).amount))
+    expect(answer({ ...analysis, view: 'summary' }).headline).toContain('上一期间')
+  })
+  it('limits a product comparison to the selected products in the dataset fallback', () => {
+    const analysis: Analysis = { ...base, comparison: 'none', view: 'products', product_ids: [1, 2] }
+    expect(series(analysis).labels.sort()).toEqual(['显示器', '笔记本电脑'])
+    expect(series({ ...analysis, view: 'summary' }).values).toEqual([total(scope, 1).amount! + total(scope, 2).amount!])
   })
 })

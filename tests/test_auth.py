@@ -319,24 +319,24 @@ async def test_invalid_jwt_and_unauthenticated_sales_rejected_before_query(envir
 
 
 @pytest.mark.asyncio
-async def test_all_active_roles_have_sales_access(environment, monkeypatch):
+@pytest.mark.parametrize("username", ["tester", "rep"])
+async def test_active_accounts_can_login_but_ungranted_sales_are_denied(
+    environment, username
+):
     app, client, _, _, _ = environment
 
-    class QueryReached(Exception):
-        pass
-
-    async def fake_query(*args):
-        raise QueryReached()
-
     async def session_override():
+        # 实际查询若跳过授权校验，会在使用此 Session 时失败。
         yield None
 
-    monkeypatch.setattr("salesmind.api.sales.query_sales_overview", fake_query)
     app.dependency_overrides[get_sales_session] = session_override
-    # 销售员即使当前表中指标列表为空，第一版也按已确认要求获得全部数据访问。
-    response = await login(client, username="rep")
-    with pytest.raises(QueryReached):
-        await client.get("/api/v1/sales/overview", headers=authorization(response))
+    response = await login(client, username=username)
+    assert response.status_code == 200
+    assert (
+        await client.get("/api/v1/auth/me", headers=authorization(response))
+    ).status_code == 200
+    denied = await client.get("/api/v1/sales/overview", headers=authorization(response))
+    assert denied.status_code == 403
 
 
 @pytest.mark.asyncio

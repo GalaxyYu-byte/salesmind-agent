@@ -1,6 +1,7 @@
 import { readonly, ref } from 'vue'
+import type { Access } from './analytics'
 
-export interface User { id: string; username: string; display_name: string; role: string }
+export interface User { id: string; username: string; display_name: string; role: string; allowed_metrics?: string[]; permission_version?: number }
 interface TokenResult { access_token: string; expires_in: number; user: User }
 const currentUser = ref<User | null>(null)
 const initializing = ref(true)
@@ -9,6 +10,32 @@ let accessToken = ''
 let generation = 0
 let refreshFlight: Promise<void> | null = null
 const csrfHeaders = { 'X-SalesMind-CSRF': '1' }
+const accessListeners = new Set<() => void>()
+let observedAccess = ''
+let accessGeneration = 0
+const responseGenerations = new WeakMap<Response, number>()
+const latestPermissionVersions = new Map<string, number>()
+export function getAccessGeneration() { return accessGeneration }
+export function assertAccessGeneration(expected: number) { if (accessGeneration !== expected) throw new ApiError('账号权限已变化，请重新读取数据', 409) }
+export function responseAccessGeneration(response: Response) { return responseGenerations.get(response) ?? accessGeneration }
+export async function readAccessJson<T = any>(response: Response): Promise<T> {
+  const expected = responseAccessGeneration(response)
+  assertAccessGeneration(expected)
+  const value = await response.json()
+  assertAccessGeneration(expected)
+  return value as T
+}
+export function invalidateAccess() { accessGeneration++; observedAccess = ''; accessListeners.forEach(listener => listener()) }
+export function onAccessInvalidated(listener: () => void) { accessListeners.add(listener); return () => { accessListeners.delete(listener) } }
+export function observeAccess(access: Access) {
+  if (access.permission_version < (latestPermissionVersions.get(access.user_id) ?? 0)) throw new ApiError('账号权限已变化，请重新读取数据', 409)
+  if (currentUser.value && access.user_id !== currentUser.value.id) throw new ApiError('账号已切换，请重新读取数据', 409)
+  if (currentUser.value?.id === access.user_id && access.permission_version < (currentUser.value.permission_version ?? 0)) throw new ApiError('账号权限已变化，请重新读取数据', 409)
+  const key = `${access.user_id}:${access.permission_version}:${access.scope_hash}`
+  if (observedAccess && observedAccess !== key) invalidateAccess()
+  observedAccess = key
+  latestPermissionVersions.set(access.user_id, access.permission_version)
+}
 
 export class ApiError extends Error {
   constructor(message: string, public status: number) { super(message) }
@@ -24,6 +51,8 @@ async function requireOk(response: Response) {
 function applyTokens(result: TokenResult, expectedGeneration: number) {
   if (generation !== expectedGeneration) throw new Error('会话已切换，请重新操作')
   if (!result.access_token || !result.user?.id) throw new Error('登录接口返回格式无效')
+  if (currentUser.value && (currentUser.value.id !== result.user.id || currentUser.value.permission_version !== result.user.permission_version)) invalidateAccess()
+  if (result.user.permission_version !== undefined) latestPermissionVersions.set(result.user.id, Math.max(result.user.permission_version, latestPermissionVersions.get(result.user.id) ?? 0))
   accessToken = result.access_token
   currentUser.value = result.user
   sessionError.value = ''
@@ -33,6 +62,7 @@ function clearSession(message = '') {
   generation++
   accessToken = ''
   currentUser.value = null
+  invalidateAccess()
   sessionError.value = message
 }
 
@@ -88,18 +118,24 @@ export async function authFetch(url: string, init: RequestInit = {}): Promise<Re
   const expected = generation
   if (!accessToken) await refreshAccess()
   const usedToken = accessToken
+  let requestGeneration = accessGeneration
   const request = () => {
     if (generation !== expected) throw new Error('会话已切换，请重新登录')
     const headers = new Headers(init.headers)
     headers.set('Authorization', `Bearer ${accessToken}`)
+    requestGeneration = accessGeneration
     return fetch(url, { ...init, headers, credentials: 'same-origin', cache: 'no-store' })
   }
   let response = await request()
+  assertAccessGeneration(requestGeneration)
   if (response.status === 401) {
     if (accessToken === usedToken) await refreshAccess()
     response = await request()
+    assertAccessGeneration(requestGeneration)
     if (response.status === 401) { clearSession('登录已失效，请重新登录'); throw new ApiError('登录已失效，请重新登录', 401) }
   }
+  if ([403, 409].includes(response.status)) invalidateAccess()
+  responseGenerations.set(response, accessGeneration)
   return response
 }
 

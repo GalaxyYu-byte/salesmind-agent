@@ -6,7 +6,7 @@ from salesmind.core.config import Settings
 
 
 class RedisStore:
-    """按当前部署接入一台 Redis；Checkpoint 与缓存逻辑后续实现。"""
+    """按当前部署接入一台 Redis，用于设备会话和授权查询缓存。"""
 
     def __init__(self, settings: Settings):
         self.client: Redis | None = None

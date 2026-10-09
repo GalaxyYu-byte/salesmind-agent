@@ -54,6 +54,8 @@ class UserResponse(BaseModel):
     username: str
     display_name: str
     role: str
+    allowed_metrics: list[str]
+    permission_version: int
 
 
 class TokenResponse(BaseModel):
@@ -69,6 +71,8 @@ def public_user(user: AppUser) -> UserResponse:
         username=user.username,
         display_name=user.display_name,
         role=user.role,
+        allowed_metrics=user.allowed_metrics_json,
+        permission_version=user.permission_version,
     )
 
 

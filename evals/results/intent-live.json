@@ -1,0 +1,1767 @@
+{
+  "mode": "live",
+  "reference_date": "2026-10-08",
+  "timezone": "Asia/Shanghai",
+  "catalog": {
+    "available_from": "2024-02-01",
+    "complete_through": "2026-09-21",
+    "regions": [
+      {
+        "id": 1,
+        "name": "华东"
+      },
+      {
+        "id": 2,
+        "name": "华南"
+      }
+    ]
+  },
+  "model": "deepseek-flash",
+  "sales_database": "isolated spy; no real sales query",
+  "cases_total": 10,
+  "turns_total": 20,
+  "cases_passed": 8,
+  "turns_passed": 18,
+  "rows": [
+    {
+      "case_id": "01-complete",
+      "name": "完整问句：销售额月趋势",
+      "turn": 1,
+      "text": "2026年8月华东销售额走势如何？",
+      "expected": {
+        "status": "completed",
+        "analysis": {
+          "scope": {
+            "months": [
+              "2026-08"
+            ],
+            "region": 1
+          },
+          "metric": "amount",
+          "view": "trend",
+          "chart": "line",
+          "comparison": "none",
+          "sort_by": "value",
+          "sort_order": "desc",
+          "top_n": null,
+          "goal": "overview"
+        },
+        "fields": [],
+        "error_code": null,
+        "query_delta": 1,
+        "inherited": []
+      },
+      "expected_draft": {
+        "metric": "amount",
+        "period": {
+          "kind": "range",
+          "start_month": "2026-08",
+          "end_month": "2026-08"
+        },
+        "region_name": "华东",
+        "view": "trend"
+      },
+      "actual": {
+        "status": "completed",
+        "analysis": {
+          "scope": {
+            "months": [
+              "2026-08"
+            ],
+            "region": 1
+          },
+          "metric": "amount",
+          "view": "trend",
+          "chart": "line",
+          "comparison": "none",
+          "sort_by": "value",
+          "sort_order": "desc",
+          "top_n": null,
+          "goal": "overview"
+        },
+        "fields": [],
+        "error_code": null,
+        "query_delta": 1,
+        "inherited": [],
+        "stages": [
+          "understand",
+          "plan",
+          "query",
+          "analyze",
+          "visualize",
+          "result"
+        ],
+        "context_run_id": null,
+        "query_parameters": {
+          "start_month": "2026-08",
+          "end_month": "2026-08",
+          "region_id": 1
+        }
+      },
+      "issues": [],
+      "passed": true,
+      "model_input": {
+        "question": "2026年8月华东销售额走势如何？",
+        "replies": [],
+        "reference_date": "2026-10-08",
+        "previous_analysis": null,
+        "draft": {
+          "metric": "amount",
+          "period": {
+            "kind": "range",
+            "start_month": "2026-08",
+            "end_month": "2026-08",
+            "count": null
+          },
+          "region_name": "华东",
+          "region_unknown": false,
+          "region_all": false,
+          "follow_up": false,
+          "view": "trend",
+          "chart": null,
+          "comparison": null,
+          "sort_by": null,
+          "sort_order": null,
+          "top_n": null,
+          "goal": null,
+          "unsupported": false
+        }
+      }
+    },
+    {
+      "case_id": "02-missing-time",
+      "name": "缺少时间，补齐后查询",
+      "turn": 1,
+      "text": "华东卖了多少钱？",
+      "expected": {
+        "status": "awaiting_input",
+        "analysis": null,
+        "fields": [
+          "months"
+        ],
+        "error_code": null,
+        "query_delta": 0,
+        "inherited": []
+      },
+      "expected_draft": {
+        "metric": "amount",
+        "period": null,
+        "region_name": "华东"
+      },
+      "actual": {
+        "status": "awaiting_input",
+        "analysis": null,
+        "fields": [
+          "months"
+        ],
+        "error_code": null,
+        "query_delta": 0,
+        "inherited": [],
+        "stages": [
+          "understand"
+        ],
+        "context_run_id": null
+      },
+      "issues": [],
+      "passed": true,
+      "model_input": {
+        "question": "华东卖了多少钱？",
+        "replies": [],
+        "reference_date": "2026-10-08",
+        "previous_analysis": null,
+        "draft": {
+          "metric": "amount",
+          "period": null,
+          "region_name": "华东",
+          "region_unknown": false,
+          "region_all": false,
+          "follow_up": false,
+          "view": "summary",
+          "chart": null,
+          "comparison": null,
+          "sort_by": null,
+          "sort_order": null,
+          "top_n": null,
+          "goal": null,
+          "unsupported": false
+        }
+      }
+    },
+    {
+      "case_id": "02-missing-time",
+      "name": "缺少时间，补齐后查询",
+      "turn": 2,
+      "text": "2026年8月",
+      "expected": {
+        "status": "completed",
+        "analysis": {
+          "scope": {
+            "months": [
+              "2026-08"
+            ],
+            "region": 1
+          },
+          "metric": "amount",
+          "view": "summary",
+          "chart": "bar",
+          "comparison": "none",
+          "sort_by": "value",
+          "sort_order": "desc",
+          "top_n": null,
+          "goal": "overview"
+        },
+        "fields": [],
+        "error_code": null,
+        "query_delta": 1,
+        "inherited": []
+      },
+      "expected_draft": {
+        "metric": "amount",
+        "period": {
+          "kind": "range",
+          "start_month": "2026-08",
+          "end_month": "2026-08"
+        },
+        "region_name": "华东"
+      },
+      "actual": {
+        "status": "completed",
+        "analysis": {
+          "scope": {
+            "months": [
+              "2026-08"
+            ],
+            "region": 1
+          },
+          "metric": "amount",
+          "view": "summary",
+          "chart": "bar",
+          "comparison": "none",
+          "sort_by": "value",
+          "sort_order": "desc",
+          "top_n": null,
+          "goal": "overview"
+        },
+        "fields": [],
+        "error_code": null,
+        "query_delta": 1,
+        "inherited": [],
+        "stages": [
+          "understand",
+          "understand",
+          "plan",
+          "query",
+          "analyze",
+          "visualize",
+          "result"
+        ],
+        "context_run_id": null,
+        "query_parameters": {
+          "start_month": "2026-08",
+          "end_month": "2026-08",
+          "region_id": 1
+        }
+      },
+      "issues": [],
+      "passed": true,
+      "model_input": {
+        "question": "华东卖了多少钱？",
+        "replies": [
+          "2026年8月"
+        ],
+        "reference_date": "2026-10-08",
+        "previous_analysis": null,
+        "draft": {
+          "metric": "amount",
+          "period": {
+            "kind": "range",
+            "start_month": "2026-08",
+            "end_month": "2026-08",
+            "count": null
+          },
+          "region_name": "华东",
+          "region_unknown": false,
+          "region_all": false,
+          "follow_up": false,
+          "view": "summary",
+          "chart": null,
+          "comparison": null,
+          "sort_by": null,
+          "sort_order": null,
+          "top_n": null,
+          "goal": null,
+          "unsupported": false
+        }
+      }
+    },
+    {
+      "case_id": "03-multiple-corrections",
+      "name": "连续澄清，最后更正区域、指标、时间",
+      "turn": 1,
+      "text": "看看华东",
+      "expected": {
+        "status": "awaiting_input",
+        "analysis": null,
+        "fields": [
+          "metric",
+          "months"
+        ],
+        "error_code": null,
+        "query_delta": 0,
+        "inherited": []
+      },
+      "expected_draft": {
+        "region_name": "华东",
+        "metric": null,
+        "period": null
+      },
+      "actual": {
+        "status": "awaiting_input",
+        "analysis": null,
+        "fields": [
+          "metric",
+          "months"
+        ],
+        "error_code": null,
+        "query_delta": 0,
+        "inherited": [],
+        "stages": [
+          "understand"
+        ],
+        "context_run_id": null
+      },
+      "issues": [],
+      "passed": true,
+      "model_input": {
+        "question": "看看华东",
+        "replies": [],
+        "reference_date": "2026-10-08",
+        "previous_analysis": null,
+        "draft": {
+          "metric": null,
+          "period": null,
+          "region_name": "华东",
+          "region_unknown": false,
+          "region_all": false,
+          "follow_up": false,
+          "view": null,
+          "chart": null,
+          "comparison": null,
+          "sort_by": null,
+          "sort_order": null,
+          "top_n": null,
+          "goal": null,
+          "unsupported": false
+        }
+      }
+    },
+    {
+      "case_id": "03-multiple-corrections",
+      "name": "连续澄清，最后更正区域、指标、时间",
+      "turn": 2,
+      "text": "按销售额统计",
+      "expected": {
+        "status": "awaiting_input",
+        "analysis": null,
+        "fields": [
+          "months"
+        ],
+        "error_code": null,
+        "query_delta": 0,
+        "inherited": []
+      },
+      "expected_draft": {
+        "metric": "amount",
+        "period": null,
+        "region_name": "华东"
+      },
+      "actual": {
+        "status": "awaiting_input",
+        "analysis": null,
+        "fields": [
+          "months"
+        ],
+        "error_code": null,
+        "query_delta": 0,
+        "inherited": [],
+        "stages": [
+          "understand",
+          "understand"
+        ],
+        "context_run_id": null
+      },
+      "issues": [],
+      "passed": true,
+      "model_input": {
+        "question": "看看华东",
+        "replies": [
+          "按销售额统计"
+        ],
+        "reference_date": "2026-10-08",
+        "previous_analysis": null,
+        "draft": {
+          "metric": "amount",
+          "period": null,
+          "region_name": "华东",
+          "region_unknown": false,
+          "region_all": false,
+          "follow_up": false,
+          "view": null,
+          "chart": null,
+          "comparison": null,
+          "sort_by": null,
+          "sort_order": null,
+          "top_n": null,
+          "goal": null,
+          "unsupported": false
+        }
+      }
+    },
+    {
+      "case_id": "03-multiple-corrections",
+      "name": "连续澄清，最后更正区域、指标、时间",
+      "turn": 3,
+      "text": "不看华东了，改成2026年7月华南订单数",
+      "expected": {
+        "status": "completed",
+        "analysis": {
+          "scope": {
+            "months": [
+              "2026-07"
+            ],
+            "region": 2
+          },
+          "metric": "count",
+          "view": "summary",
+          "chart": "bar",
+          "comparison": "none",
+          "sort_by": "value",
+          "sort_order": "desc",
+          "top_n": null,
+          "goal": "overview"
+        },
+        "fields": [],
+        "error_code": null,
+        "query_delta": 1,
+        "inherited": []
+      },
+      "expected_draft": {
+        "metric": "count",
+        "period": {
+          "kind": "range",
+          "start_month": "2026-07",
+          "end_month": "2026-07"
+        },
+        "region_name": "华南"
+      },
+      "actual": {
+        "status": "completed",
+        "analysis": {
+          "scope": {
+            "months": [
+              "2026-07"
+            ],
+            "region": 2
+          },
+          "metric": "count",
+          "view": "summary",
+          "chart": "bar",
+          "comparison": "none",
+          "sort_by": "value",
+          "sort_order": "desc",
+          "top_n": null,
+          "goal": "overview"
+        },
+        "fields": [],
+        "error_code": null,
+        "query_delta": 1,
+        "inherited": [],
+        "stages": [
+          "understand",
+          "understand",
+          "understand",
+          "plan",
+          "query",
+          "analyze",
+          "visualize",
+          "result"
+        ],
+        "context_run_id": null,
+        "query_parameters": {
+          "start_month": "2026-07",
+          "end_month": "2026-07",
+          "region_id": 2
+        }
+      },
+      "issues": [],
+      "passed": true,
+      "model_input": {
+        "question": "看看华东",
+        "replies": [
+          "按销售额统计",
+          "不看华东了，改成2026年7月华南订单数"
+        ],
+        "reference_date": "2026-10-08",
+        "previous_analysis": null,
+        "draft": {
+          "metric": "count",
+          "period": {
+            "kind": "range",
+            "start_month": "2026-07",
+            "end_month": "2026-07",
+            "count": null
+          },
+          "region_name": "华南",
+          "region_unknown": false,
+          "region_all": false,
+          "follow_up": true,
+          "view": null,
+          "chart": null,
+          "comparison": null,
+          "sort_by": null,
+          "sort_order": null,
+          "top_n": null,
+          "goal": null,
+          "unsupported": false
+        }
+      }
+    },
+    {
+      "case_id": "04-correct-metric",
+      "name": "模糊时间不能查询，更正指标后继续追问",
+      "turn": 1,
+      "text": "最近华东销售额走势如何？",
+      "expected": {
+        "status": "awaiting_input",
+        "analysis": null,
+        "fields": [
+          "months"
+        ],
+        "error_code": null,
+        "query_delta": 0,
+        "inherited": []
+      },
+      "expected_draft": {
+        "metric": "amount",
+        "period": null,
+        "region_name": "华东",
+        "view": "trend"
+      },
+      "actual": {
+        "status": "awaiting_input",
+        "analysis": null,
+        "fields": [
+          "months"
+        ],
+        "error_code": null,
+        "query_delta": 0,
+        "inherited": [],
+        "stages": [
+          "understand"
+        ],
+        "context_run_id": null
+      },
+      "issues": [],
+      "passed": true,
+      "model_input": {
+        "question": "最近华东销售额走势如何？",
+        "replies": [],
+        "reference_date": "2026-10-08",
+        "previous_analysis": null,
+        "draft": {
+          "metric": "amount",
+          "period": null,
+          "region_name": "华东",
+          "region_unknown": false,
+          "region_all": false,
+          "follow_up": false,
+          "view": "trend",
+          "chart": null,
+          "comparison": null,
+          "sort_by": null,
+          "sort_order": null,
+          "top_n": null,
+          "goal": null,
+          "unsupported": false
+        }
+      }
+    },
+    {
+      "case_id": "04-correct-metric",
+      "name": "模糊时间不能查询，更正指标后继续追问",
+      "turn": 2,
+      "text": "不是销售额，改看毛利",
+      "expected": {
+        "status": "awaiting_input",
+        "analysis": null,
+        "fields": [
+          "months"
+        ],
+        "error_code": null,
+        "query_delta": 0,
+        "inherited": []
+      },
+      "expected_draft": {
+        "metric": "profit",
+        "period": null,
+        "region_name": "华东",
+        "view": "trend"
+      },
+      "actual": {
+        "status": "awaiting_input",
+        "analysis": null,
+        "fields": [
+          "context"
+        ],
+        "error_code": null,
+        "query_delta": 0,
+        "inherited": [],
+        "stages": [
+          "understand",
+          "understand"
+        ],
+        "context_run_id": null
+      },
+      "issues": [
+        ".fields: expected=['months'], actual=['context']"
+      ],
+      "passed": false,
+      "model_input": {
+        "question": "最近华东销售额走势如何？",
+        "replies": [
+          "不是销售额，改看毛利"
+        ],
+        "reference_date": "2026-10-08",
+        "previous_analysis": null,
+        "draft": {
+          "metric": "profit",
+          "period": null,
+          "region_name": "华东",
+          "region_unknown": false,
+          "region_all": false,
+          "follow_up": true,
+          "view": "trend",
+          "chart": null,
+          "comparison": null,
+          "sort_by": null,
+          "sort_order": null,
+          "top_n": null,
+          "goal": null,
+          "unsupported": false
+        }
+      }
+    },
+    {
+      "case_id": "04-correct-metric",
+      "name": "模糊时间不能查询，更正指标后继续追问",
+      "turn": 3,
+      "text": "2026年7月至8月",
+      "expected": {
+        "status": "completed",
+        "analysis": {
+          "scope": {
+            "months": [
+              "2026-07",
+              "2026-08"
+            ],
+            "region": 1
+          },
+          "metric": "profit",
+          "view": "trend",
+          "chart": "line",
+          "comparison": "none",
+          "sort_by": "value",
+          "sort_order": "desc",
+          "top_n": null,
+          "goal": "overview"
+        },
+        "fields": [],
+        "error_code": null,
+        "query_delta": 1,
+        "inherited": []
+      },
+      "expected_draft": {
+        "metric": "profit",
+        "period": {
+          "kind": "range",
+          "start_month": "2026-07",
+          "end_month": "2026-08"
+        },
+        "region_name": "华东",
+        "view": "trend"
+      },
+      "actual": {
+        "status": "completed",
+        "analysis": {
+          "scope": {
+            "months": [
+              "2026-07",
+              "2026-08"
+            ],
+            "region": 1
+          },
+          "metric": "profit",
+          "view": "trend",
+          "chart": "line",
+          "comparison": "none",
+          "sort_by": "value",
+          "sort_order": "desc",
+          "top_n": null,
+          "goal": "overview"
+        },
+        "fields": [],
+        "error_code": null,
+        "query_delta": 1,
+        "inherited": [],
+        "stages": [
+          "understand",
+          "understand",
+          "understand",
+          "plan",
+          "query",
+          "analyze",
+          "visualize",
+          "result"
+        ],
+        "context_run_id": null,
+        "query_parameters": {
+          "start_month": "2026-07",
+          "end_month": "2026-08",
+          "region_id": 1
+        }
+      },
+      "issues": [],
+      "passed": true,
+      "model_input": {
+        "question": "最近华东销售额走势如何？",
+        "replies": [
+          "不是销售额，改看毛利",
+          "2026年7月至8月"
+        ],
+        "reference_date": "2026-10-08",
+        "previous_analysis": null,
+        "draft": {
+          "metric": "profit",
+          "period": {
+            "kind": "range",
+            "start_month": "2026-07",
+            "end_month": "2026-08",
+            "count": null
+          },
+          "region_name": "华东",
+          "region_unknown": false,
+          "region_all": false,
+          "follow_up": true,
+          "view": "trend",
+          "chart": null,
+          "comparison": null,
+          "sort_by": null,
+          "sort_order": null,
+          "top_n": null,
+          "goal": null,
+          "unsupported": false
+        }
+      }
+    },
+    {
+      "case_id": "05-region-followup",
+      "name": "区域追问继承已确认月份、指标、视图",
+      "turn": 1,
+      "text": "2026年8月华东平均客单价走势",
+      "expected": {
+        "status": "completed",
+        "analysis": {
+          "scope": {
+            "months": [
+              "2026-08"
+            ],
+            "region": 1
+          },
+          "metric": "average",
+          "view": "trend",
+          "chart": "line",
+          "comparison": "none",
+          "sort_by": "value",
+          "sort_order": "desc",
+          "top_n": null,
+          "goal": "overview"
+        },
+        "fields": [],
+        "error_code": null,
+        "query_delta": 1,
+        "inherited": []
+      },
+      "expected_draft": {
+        "metric": "average",
+        "period": {
+          "kind": "range",
+          "start_month": "2026-08",
+          "end_month": "2026-08"
+        },
+        "region_name": "华东",
+        "view": "trend"
+      },
+      "actual": {
+        "status": "completed",
+        "analysis": {
+          "scope": {
+            "months": [
+              "2026-08"
+            ],
+            "region": 1
+          },
+          "metric": "average",
+          "view": "trend",
+          "chart": "line",
+          "comparison": "none",
+          "sort_by": "value",
+          "sort_order": "desc",
+          "top_n": null,
+          "goal": "overview"
+        },
+        "fields": [],
+        "error_code": null,
+        "query_delta": 1,
+        "inherited": [],
+        "stages": [
+          "understand",
+          "plan",
+          "query",
+          "analyze",
+          "visualize",
+          "result"
+        ],
+        "context_run_id": null,
+        "query_parameters": {
+          "start_month": "2026-08",
+          "end_month": "2026-08",
+          "region_id": 1
+        }
+      },
+      "issues": [],
+      "passed": true,
+      "model_input": {
+        "question": "2026年8月华东平均客单价走势",
+        "replies": [],
+        "reference_date": "2026-10-08",
+        "previous_analysis": null,
+        "draft": {
+          "metric": "average",
+          "period": {
+            "kind": "range",
+            "start_month": "2026-08",
+            "end_month": "2026-08",
+            "count": null
+          },
+          "region_name": "华东",
+          "region_unknown": false,
+          "region_all": false,
+          "follow_up": false,
+          "view": "trend",
+          "chart": null,
+          "comparison": null,
+          "sort_by": null,
+          "sort_order": null,
+          "top_n": null,
+          "goal": null,
+          "unsupported": false
+        }
+      }
+    },
+    {
+      "case_id": "05-region-followup",
+      "name": "区域追问继承已确认月份、指标、视图",
+      "turn": 2,
+      "text": "华南呢？",
+      "expected": {
+        "status": "completed",
+        "analysis": {
+          "scope": {
+            "months": [
+              "2026-08"
+            ],
+            "region": 2
+          },
+          "metric": "average",
+          "view": "trend",
+          "chart": "line",
+          "comparison": "none",
+          "sort_by": "value",
+          "sort_order": "desc",
+          "top_n": null,
+          "goal": "overview"
+        },
+        "fields": [],
+        "error_code": null,
+        "query_delta": 1,
+        "inherited": [
+          "metric",
+          "months",
+          "view",
+          "chart",
+          "comparison"
+        ]
+      },
+      "expected_draft": {
+        "follow_up": true,
+        "region_name": "华南"
+      },
+      "actual": {
+        "status": "completed",
+        "analysis": {
+          "scope": {
+            "months": [
+              "2026-08"
+            ],
+            "region": 2
+          },
+          "metric": "average",
+          "view": "trend",
+          "chart": "line",
+          "comparison": "none",
+          "sort_by": "value",
+          "sort_order": "desc",
+          "top_n": null,
+          "goal": "overview"
+        },
+        "fields": [],
+        "error_code": null,
+        "query_delta": 1,
+        "inherited": [
+          "metric",
+          "months",
+          "view",
+          "chart",
+          "comparison"
+        ],
+        "stages": [
+          "understand",
+          "plan",
+          "query",
+          "analyze",
+          "visualize",
+          "result"
+        ],
+        "context_run_id": "687f74ce-08e5-49f8-8b9a-2c9f9540becc",
+        "query_parameters": {
+          "start_month": "2026-08",
+          "end_month": "2026-08",
+          "region_id": 2
+        }
+      },
+      "issues": [],
+      "passed": true,
+      "model_input": {
+        "question": "华南呢？",
+        "replies": [],
+        "reference_date": "2026-10-08",
+        "previous_analysis": {
+          "metric": "average",
+          "view": "trend",
+          "chart": "line",
+          "comparison": "none",
+          "sort_by": "value",
+          "sort_order": "desc",
+          "top_n": null,
+          "goal": "overview",
+          "months": [
+            "2026-08"
+          ],
+          "region_name": "华东",
+          "region_all": false
+        },
+        "draft": {
+          "metric": null,
+          "period": null,
+          "region_name": "华南",
+          "region_unknown": false,
+          "region_all": false,
+          "follow_up": true,
+          "view": null,
+          "chart": null,
+          "comparison": null,
+          "sort_by": null,
+          "sort_order": null,
+          "top_n": null,
+          "goal": null,
+          "unsupported": false
+        }
+      }
+    },
+    {
+      "case_id": "06-no-history",
+      "name": "新会话区域追问不能跨会话继承",
+      "turn": 1,
+      "text": "华南呢？",
+      "expected": {
+        "status": "awaiting_input",
+        "analysis": null,
+        "fields": [
+          "context"
+        ],
+        "error_code": null,
+        "query_delta": 0,
+        "inherited": []
+      },
+      "expected_draft": {
+        "follow_up": true,
+        "region_name": "华南"
+      },
+      "actual": {
+        "status": "awaiting_input",
+        "analysis": null,
+        "fields": [
+          "context"
+        ],
+        "error_code": null,
+        "query_delta": 0,
+        "inherited": [],
+        "stages": [
+          "understand"
+        ],
+        "context_run_id": null
+      },
+      "issues": [],
+      "passed": true,
+      "model_input": {
+        "question": "华南呢？",
+        "replies": [],
+        "reference_date": "2026-10-08",
+        "previous_analysis": null,
+        "draft": {
+          "metric": null,
+          "period": null,
+          "region_name": "华南",
+          "region_unknown": false,
+          "region_all": false,
+          "follow_up": true,
+          "view": null,
+          "chart": null,
+          "comparison": null,
+          "sort_by": null,
+          "sort_order": null,
+          "top_n": null,
+          "goal": null,
+          "unsupported": false
+        }
+      }
+    },
+    {
+      "case_id": "06-no-history",
+      "name": "新会话区域追问不能跨会话继承",
+      "turn": 2,
+      "text": "看2026年8月华南订单数汇总",
+      "expected": {
+        "status": "completed",
+        "analysis": {
+          "scope": {
+            "months": [
+              "2026-08"
+            ],
+            "region": 2
+          },
+          "metric": "count",
+          "view": "summary",
+          "chart": "bar",
+          "comparison": "none",
+          "sort_by": "value",
+          "sort_order": "desc",
+          "top_n": null,
+          "goal": "overview"
+        },
+        "fields": [],
+        "error_code": null,
+        "query_delta": 1,
+        "inherited": []
+      },
+      "expected_draft": {
+        "metric": "count",
+        "period": {
+          "kind": "range",
+          "start_month": "2026-08",
+          "end_month": "2026-08"
+        },
+        "region_name": "华南"
+      },
+      "actual": {
+        "status": "completed",
+        "analysis": {
+          "scope": {
+            "months": [
+              "2026-08"
+            ],
+            "region": 2
+          },
+          "metric": "count",
+          "view": "summary",
+          "chart": "bar",
+          "comparison": "none",
+          "sort_by": "value",
+          "sort_order": "desc",
+          "top_n": null,
+          "goal": "overview"
+        },
+        "fields": [],
+        "error_code": null,
+        "query_delta": 1,
+        "inherited": [],
+        "stages": [
+          "understand",
+          "understand",
+          "plan",
+          "query",
+          "analyze",
+          "visualize",
+          "result"
+        ],
+        "context_run_id": null,
+        "query_parameters": {
+          "start_month": "2026-08",
+          "end_month": "2026-08",
+          "region_id": 2
+        }
+      },
+      "issues": [],
+      "passed": true,
+      "model_input": {
+        "question": "华南呢？",
+        "replies": [
+          "看2026年8月华南订单数汇总"
+        ],
+        "reference_date": "2026-10-08",
+        "previous_analysis": null,
+        "draft": {
+          "metric": "count",
+          "period": {
+            "kind": "range",
+            "start_month": "2026-08",
+            "end_month": "2026-08",
+            "count": null
+          },
+          "region_name": "华南",
+          "region_unknown": false,
+          "region_all": false,
+          "follow_up": true,
+          "view": "summary",
+          "chart": null,
+          "comparison": null,
+          "sort_by": null,
+          "sort_order": null,
+          "top_n": null,
+          "goal": null,
+          "unsupported": false
+        }
+      }
+    },
+    {
+      "case_id": "07-unknown-region",
+      "name": "未知区域应澄清，不能改成全部区域",
+      "turn": 1,
+      "text": "2026年8月火星区销售额多少？",
+      "expected": {
+        "status": "awaiting_input",
+        "analysis": null,
+        "fields": [
+          "region"
+        ],
+        "error_code": null,
+        "query_delta": 0,
+        "inherited": []
+      },
+      "expected_draft": {
+        "metric": "amount",
+        "period": {
+          "kind": "range",
+          "start_month": "2026-08",
+          "end_month": "2026-08"
+        },
+        "region_name": null,
+        "region_unknown": true
+      },
+      "actual": {
+        "status": "awaiting_input",
+        "analysis": null,
+        "fields": [
+          "region"
+        ],
+        "error_code": null,
+        "query_delta": 0,
+        "inherited": [],
+        "stages": [
+          "understand"
+        ],
+        "context_run_id": null
+      },
+      "issues": [],
+      "passed": true,
+      "model_input": {
+        "question": "2026年8月火星区销售额多少？",
+        "replies": [],
+        "reference_date": "2026-10-08",
+        "previous_analysis": null,
+        "draft": {
+          "metric": "amount",
+          "period": {
+            "kind": "range",
+            "start_month": "2026-08",
+            "end_month": "2026-08",
+            "count": null
+          },
+          "region_name": null,
+          "region_unknown": true,
+          "region_all": false,
+          "follow_up": false,
+          "view": "summary",
+          "chart": null,
+          "comparison": null,
+          "sort_by": null,
+          "sort_order": null,
+          "top_n": null,
+          "goal": null,
+          "unsupported": false
+        }
+      }
+    },
+    {
+      "case_id": "07-unknown-region",
+      "name": "未知区域应澄清，不能改成全部区域",
+      "turn": 2,
+      "text": "区域改成华南",
+      "expected": {
+        "status": "completed",
+        "analysis": {
+          "scope": {
+            "months": [
+              "2026-08"
+            ],
+            "region": 2
+          },
+          "metric": "amount",
+          "view": "summary",
+          "chart": "bar",
+          "comparison": "none",
+          "sort_by": "value",
+          "sort_order": "desc",
+          "top_n": null,
+          "goal": "overview"
+        },
+        "fields": [],
+        "error_code": null,
+        "query_delta": 1,
+        "inherited": []
+      },
+      "expected_draft": {
+        "metric": "amount",
+        "period": {
+          "kind": "range",
+          "start_month": "2026-08",
+          "end_month": "2026-08"
+        },
+        "region_name": "华南"
+      },
+      "actual": {
+        "status": "completed",
+        "analysis": {
+          "scope": {
+            "months": [
+              "2026-08"
+            ],
+            "region": 2
+          },
+          "metric": "amount",
+          "view": "summary",
+          "chart": "bar",
+          "comparison": "none",
+          "sort_by": "value",
+          "sort_order": "desc",
+          "top_n": null,
+          "goal": "overview"
+        },
+        "fields": [],
+        "error_code": null,
+        "query_delta": 1,
+        "inherited": [],
+        "stages": [
+          "understand",
+          "understand",
+          "plan",
+          "query",
+          "analyze",
+          "visualize",
+          "result"
+        ],
+        "context_run_id": null,
+        "query_parameters": {
+          "start_month": "2026-08",
+          "end_month": "2026-08",
+          "region_id": 2
+        }
+      },
+      "issues": [],
+      "passed": true,
+      "model_input": {
+        "question": "2026年8月火星区销售额多少？",
+        "replies": [
+          "区域改成华南"
+        ],
+        "reference_date": "2026-10-08",
+        "previous_analysis": null,
+        "draft": {
+          "metric": "amount",
+          "period": {
+            "kind": "range",
+            "start_month": "2026-08",
+            "end_month": "2026-08",
+            "count": null
+          },
+          "region_name": "华南",
+          "region_unknown": false,
+          "region_all": false,
+          "follow_up": false,
+          "view": "summary",
+          "chart": null,
+          "comparison": null,
+          "sort_by": null,
+          "sort_order": null,
+          "top_n": null,
+          "goal": null,
+          "unsupported": false
+        }
+      }
+    },
+    {
+      "case_id": "08-unknown-metric",
+      "name": "净利润不等于毛利，未知指标停止查询",
+      "turn": 1,
+      "text": "2026年8月华东净利润多少？",
+      "expected": {
+        "status": "failed",
+        "analysis": null,
+        "fields": [],
+        "error_code": "unsupported",
+        "query_delta": 0,
+        "inherited": []
+      },
+      "expected_draft": {
+        "unsupported": true
+      },
+      "actual": {
+        "status": "completed",
+        "analysis": {
+          "scope": {
+            "months": [
+              "2026-08"
+            ],
+            "region": 1
+          },
+          "metric": "profit",
+          "view": "summary",
+          "chart": "bar",
+          "comparison": "none",
+          "sort_by": "value",
+          "sort_order": "desc",
+          "top_n": null,
+          "goal": "overview"
+        },
+        "fields": [],
+        "error_code": null,
+        "query_delta": 1,
+        "inherited": [],
+        "stages": [
+          "understand",
+          "plan",
+          "query",
+          "analyze",
+          "visualize",
+          "result"
+        ],
+        "context_run_id": null,
+        "query_parameters": {
+          "start_month": "2026-08",
+          "end_month": "2026-08",
+          "region_id": 1
+        }
+      },
+      "issues": [
+        ".status: expected='failed', actual='completed'",
+        ".analysis: expected=None, actual={'scope': {'months': ['2026-08'], 'region': 1}, 'metric': 'profit', 'view': 'summary', 'chart': 'bar', 'comparison': 'none', 'sort_by': 'value', 'sort_order': 'desc', 'top_n': None, 'goal': 'overview'}",
+        ".error_code: expected='unsupported', actual=None",
+        ".query_delta: expected=0, actual=1",
+        ".draft.unsupported: expected=True, actual=False",
+        "应阻断时启动了 query 节点"
+      ],
+      "passed": false,
+      "model_input": {
+        "question": "2026年8月华东净利润多少？",
+        "replies": [],
+        "reference_date": "2026-10-08",
+        "previous_analysis": null,
+        "draft": {
+          "metric": "profit",
+          "period": {
+            "kind": "range",
+            "start_month": "2026-08",
+            "end_month": "2026-08",
+            "count": null
+          },
+          "region_name": "华东",
+          "region_unknown": false,
+          "region_all": false,
+          "follow_up": false,
+          "view": "summary",
+          "chart": null,
+          "comparison": null,
+          "sort_by": null,
+          "sort_order": null,
+          "top_n": null,
+          "goal": null,
+          "unsupported": false
+        }
+      }
+    },
+    {
+      "case_id": "09-unknown-followup",
+      "name": "未知指标追问不能沿用上一轮销售额",
+      "turn": 1,
+      "text": "2026年8月华东销售额多少？",
+      "expected": {
+        "status": "completed",
+        "analysis": {
+          "scope": {
+            "months": [
+              "2026-08"
+            ],
+            "region": 1
+          },
+          "metric": "amount",
+          "view": "summary",
+          "chart": "bar",
+          "comparison": "none",
+          "sort_by": "value",
+          "sort_order": "desc",
+          "top_n": null,
+          "goal": "overview"
+        },
+        "fields": [],
+        "error_code": null,
+        "query_delta": 1,
+        "inherited": []
+      },
+      "expected_draft": {
+        "metric": "amount",
+        "period": {
+          "kind": "range",
+          "start_month": "2026-08",
+          "end_month": "2026-08"
+        },
+        "region_name": "华东"
+      },
+      "actual": {
+        "status": "completed",
+        "analysis": {
+          "scope": {
+            "months": [
+              "2026-08"
+            ],
+            "region": 1
+          },
+          "metric": "amount",
+          "view": "summary",
+          "chart": "bar",
+          "comparison": "none",
+          "sort_by": "value",
+          "sort_order": "desc",
+          "top_n": null,
+          "goal": "overview"
+        },
+        "fields": [],
+        "error_code": null,
+        "query_delta": 1,
+        "inherited": [],
+        "stages": [
+          "understand",
+          "plan",
+          "query",
+          "analyze",
+          "visualize",
+          "result"
+        ],
+        "context_run_id": null,
+        "query_parameters": {
+          "start_month": "2026-08",
+          "end_month": "2026-08",
+          "region_id": 1
+        }
+      },
+      "issues": [],
+      "passed": true,
+      "model_input": {
+        "question": "2026年8月华东销售额多少？",
+        "replies": [],
+        "reference_date": "2026-10-08",
+        "previous_analysis": null,
+        "draft": {
+          "metric": "amount",
+          "period": {
+            "kind": "range",
+            "start_month": "2026-08",
+            "end_month": "2026-08",
+            "count": null
+          },
+          "region_name": "华东",
+          "region_unknown": false,
+          "region_all": false,
+          "follow_up": false,
+          "view": "summary",
+          "chart": null,
+          "comparison": null,
+          "sort_by": null,
+          "sort_order": null,
+          "top_n": null,
+          "goal": null,
+          "unsupported": false
+        }
+      }
+    },
+    {
+      "case_id": "09-unknown-followup",
+      "name": "未知指标追问不能沿用上一轮销售额",
+      "turn": 2,
+      "text": "改看转化率呢？",
+      "expected": {
+        "status": "failed",
+        "analysis": null,
+        "fields": [],
+        "error_code": "unsupported",
+        "query_delta": 0,
+        "inherited": []
+      },
+      "expected_draft": {
+        "unsupported": true
+      },
+      "actual": {
+        "status": "failed",
+        "analysis": null,
+        "fields": [],
+        "error_code": "unsupported",
+        "query_delta": 0,
+        "inherited": [],
+        "stages": [
+          "understand"
+        ],
+        "context_run_id": "4d7e4c36-cc73-4b5a-b0e0-16a86054499c"
+      },
+      "issues": [],
+      "passed": true,
+      "model_input": {
+        "question": "改看转化率呢？",
+        "replies": [],
+        "reference_date": "2026-10-08",
+        "previous_analysis": {
+          "metric": "amount",
+          "view": "summary",
+          "chart": "bar",
+          "comparison": "none",
+          "sort_by": "value",
+          "sort_order": "desc",
+          "top_n": null,
+          "goal": "overview",
+          "months": [
+            "2026-08"
+          ],
+          "region_name": "华东",
+          "region_all": false
+        },
+        "draft": {
+          "metric": null,
+          "period": null,
+          "region_name": null,
+          "region_unknown": false,
+          "region_all": false,
+          "follow_up": true,
+          "view": null,
+          "chart": null,
+          "comparison": null,
+          "sort_by": null,
+          "sort_order": null,
+          "top_n": null,
+          "goal": null,
+          "unsupported": true
+        }
+      }
+    },
+    {
+      "case_id": "10-relative-watermark",
+      "name": "上个月按日历解析，水位不足时追问",
+      "turn": 1,
+      "text": "上个月华东销售额多少？",
+      "expected": {
+        "status": "awaiting_input",
+        "analysis": null,
+        "fields": [
+          "months"
+        ],
+        "error_code": null,
+        "query_delta": 0,
+        "inherited": []
+      },
+      "expected_draft": {
+        "metric": "amount",
+        "period": {
+          "kind": "last_month"
+        },
+        "region_name": "华东"
+      },
+      "actual": {
+        "status": "awaiting_input",
+        "analysis": null,
+        "fields": [
+          "months"
+        ],
+        "error_code": null,
+        "query_delta": 0,
+        "inherited": [],
+        "stages": [
+          "understand"
+        ],
+        "context_run_id": null
+      },
+      "issues": [],
+      "passed": true,
+      "model_input": {
+        "question": "上个月华东销售额多少？",
+        "replies": [],
+        "reference_date": "2026-10-08",
+        "previous_analysis": null,
+        "draft": {
+          "metric": "amount",
+          "period": {
+            "kind": "last_month",
+            "start_month": null,
+            "end_month": null,
+            "count": null
+          },
+          "region_name": "华东",
+          "region_unknown": false,
+          "region_all": false,
+          "follow_up": false,
+          "view": "summary",
+          "chart": null,
+          "comparison": null,
+          "sort_by": null,
+          "sort_order": null,
+          "top_n": null,
+          "goal": null,
+          "unsupported": false
+        }
+      }
+    },
+    {
+      "case_id": "10-relative-watermark",
+      "name": "上个月按日历解析，水位不足时追问",
+      "turn": 2,
+      "text": "那改成2026年8月",
+      "expected": {
+        "status": "completed",
+        "analysis": {
+          "scope": {
+            "months": [
+              "2026-08"
+            ],
+            "region": 1
+          },
+          "metric": "amount",
+          "view": "summary",
+          "chart": "bar",
+          "comparison": "none",
+          "sort_by": "value",
+          "sort_order": "desc",
+          "top_n": null,
+          "goal": "overview"
+        },
+        "fields": [],
+        "error_code": null,
+        "query_delta": 1,
+        "inherited": []
+      },
+      "expected_draft": {
+        "metric": "amount",
+        "period": {
+          "kind": "range",
+          "start_month": "2026-08",
+          "end_month": "2026-08"
+        },
+        "region_name": "华东"
+      },
+      "actual": {
+        "status": "completed",
+        "analysis": {
+          "scope": {
+            "months": [
+              "2026-08"
+            ],
+            "region": 1
+          },
+          "metric": "amount",
+          "view": "summary",
+          "chart": "bar",
+          "comparison": "none",
+          "sort_by": "value",
+          "sort_order": "desc",
+          "top_n": null,
+          "goal": "overview"
+        },
+        "fields": [],
+        "error_code": null,
+        "query_delta": 1,
+        "inherited": [],
+        "stages": [
+          "understand",
+          "understand",
+          "plan",
+          "query",
+          "analyze",
+          "visualize",
+          "result"
+        ],
+        "context_run_id": null,
+        "query_parameters": {
+          "start_month": "2026-08",
+          "end_month": "2026-08",
+          "region_id": 1
+        }
+      },
+      "issues": [],
+      "passed": true,
+      "model_input": {
+        "question": "上个月华东销售额多少？",
+        "replies": [
+          "那改成2026年8月"
+        ],
+        "reference_date": "2026-10-08",
+        "previous_analysis": null,
+        "draft": {
+          "metric": "amount",
+          "period": {
+            "kind": "range",
+            "start_month": "2026-08",
+            "end_month": "2026-08",
+            "count": null
+          },
+          "region_name": "华东",
+          "region_unknown": false,
+          "region_all": false,
+          "follow_up": true,
+          "view": "summary",
+          "chart": null,
+          "comparison": null,
+          "sort_by": null,
+          "sort_order": null,
+          "top_n": null,
+          "goal": null,
+          "unsupported": false
+        }
+      }
+    }
+  ]
+}

@@ -3,7 +3,7 @@
 from functools import lru_cache
 from urllib.parse import urlsplit
 
-from pydantic import Field, SecretStr, model_validator
+from pydantic import AliasChoices, Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from redis.connection import parse_url
 from sqlalchemy.engine import make_url
@@ -21,6 +21,7 @@ class Settings(BaseSettings):
         extra="ignore",
         hide_input_in_errors=True,
         frozen=True,
+        populate_by_name=True,
     )
 
     app_name: str = "SalesMind Agent"
@@ -35,6 +36,22 @@ class Settings(BaseSettings):
         "http://localhost:8000",
     )
     sales_query_timeout: float = Field(default=10, gt=0, le=60)
+    sales_cache_seconds: int = Field(default=60, ge=0, le=3600)
+    sales_cache_max_bytes: int = Field(default=5000000, ge=1024, le=20000000)
+    llm_api_key: SecretStr | None = Field(
+        default=None,
+        validation_alias=AliasChoices("SALESMIND_LLM_API_KEY", "DEEPSEEK_API_KEY"),
+    )
+    llm_base_url: str = "https://api.deepseek.com"
+    llm_model: str = Field(default="deepseek-flash", min_length=1, max_length=100)
+    llm_timeout: float = Field(default=30, gt=0, le=60)
+    run_concurrency: int = Field(default=4, ge=1, le=20)
+    run_queue_limit: int = Field(default=32, ge=1, le=1000)
+    run_timeout: float = Field(default=90, gt=0, le=300)
+    run_shutdown_seconds: float = Field(default=10, gt=0, le=60)
+    artifact_retention_days: int = Field(default=7, ge=1, le=30)
+    sse_poll_seconds: float = Field(default=0.5, ge=0.05, le=5)
+    sse_heartbeat_seconds: float = Field(default=15, ge=1, le=60)
     sales_database_url: SecretStr | None = None
     app_database_url: SecretStr | None = None
     allow_shared_database_account: bool = False
@@ -48,6 +65,20 @@ class Settings(BaseSettings):
     redis_connect_timeout: float = Field(default=3, gt=0)
     redis_socket_timeout: float = Field(default=3, gt=0)
     health_check_timeout: float = Field(default=5, gt=0)
+
+    @model_validator(mode="after")
+    def validate_llm_url(self) -> "Settings":
+        url = urlsplit(self.llm_base_url)
+        if (
+            url.scheme not in {"http", "https"}
+            or not url.hostname
+            or url.username is not None
+            or url.password is not None
+            or url.query
+            or url.fragment
+        ):
+            raise ValueError("模型地址必须为不含凭据、查询参数的 HTTP/HTTPS URL")
+        return self
 
     @model_validator(mode="after")
     def validate_auth_secret(self) -> "Settings":
